@@ -53,10 +53,13 @@ target_link_libraries(matcher
   openMVG_matching_image_collection
   stlplus)
 
+add_subdirectory(src/reconstruction)
+
 add_executable(reconstructor src/Reconstruct.cpp)
 target_link_libraries(reconstructor
   openMVG_system
   openMVG_image
   openMVG_features
   openMVG_sfm
+  coloc_sfm
   stlplus)

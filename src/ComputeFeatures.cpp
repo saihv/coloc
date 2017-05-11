@@ -1,15 +1,5 @@
-
-// Copyright (c) 2012, 2013 Pierre MOULON.
-
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-
 #include "openMVG/image/image.hpp"
 #include "openMVG/sfm/sfm.hpp"
-
-/// Feature/Regions & Image describer interfaces
 #include "openMVG/features/features.hpp"
 #include "nonFree/sift/SIFT_describer.hpp"
 #include <cereal/archives/json.hpp>
@@ -37,14 +27,12 @@ features::EDESCRIBER_PRESET stringToEnum(const std::string & sPreset)
 	features::EDESCRIBER_PRESET preset;
 	if (sPreset == "NORMAL")
 		preset = features::NORMAL_PRESET;
+	else if (sPreset == "HIGH")
+		preset = features::HIGH_PRESET;
+	else if (sPreset == "ULTRA")
+		preset = features::ULTRA_PRESET;
 	else
-		if (sPreset == "HIGH")
-			preset = features::HIGH_PRESET;
-		else
-			if (sPreset == "ULTRA")
-				preset = features::ULTRA_PRESET;
-			else
-				preset = features::EDESCRIBER_PRESET(-1);
+		preset = features::EDESCRIBER_PRESET(-1);
 	return preset;
 }
 
@@ -64,10 +52,8 @@ int main(int argc, char **argv)
 	int iNumThreads = 0;
 #endif
 
-	// required
 	cmd.add(make_option('i', sSfM_Data_Filename, "input_file"));
 	cmd.add(make_option('o', sOutDir, "outdir"));
-	// Optional
 	cmd.add(make_option('m', sImage_Describer_Method, "describerMethod"));
 	cmd.add(make_option('u', bUpRight, "upright"));
 	cmd.add(make_option('f', bForce, "force"));
@@ -121,14 +107,12 @@ int main(int argc, char **argv)
 		<< "--numThreads " << iNumThreads << std::endl
 #endif
 		<< std::endl;
-
-
+	
 	if (sOutDir.empty()) {
 		std::cerr << "\nIt is an invalid output directory" << std::endl;
 		return EXIT_FAILURE;
 	}
 
-	// Create output dir
 	if (!stlplus::folder_exists(sOutDir))
 	{
 		if (!stlplus::folder_create(sOutDir))
@@ -138,56 +122,35 @@ int main(int argc, char **argv)
 		}
 	}
 
-	//---------------------------------------
-	// a. Load input scene
-	//---------------------------------------
 	SfM_Data sfm_data;
 	if (!Load(sfm_data, sSfM_Data_Filename, ESfM_Data(VIEWS | INTRINSICS))) {
-		std::cerr << std::endl
-			<< "The input file \"" << sSfM_Data_Filename << "\" cannot be read" << std::endl;
+		std::cerr << std::endl	<< "The input file \"" << sSfM_Data_Filename << "\" cannot be read" << std::endl;
 		return false;
 	}
 
-	// b. Init the image_describer
-	// - retrieve the used one in case of pre-computed features
-	// - else create the desired one
-
 	using namespace openMVG::features;
 	std::unique_ptr<Image_describer> image_describer;
-
 	const std::string sImage_describer = stlplus::create_filespec(sOutDir, "image_describer", "json");
+
 	if (!bForce && stlplus::is_file(sImage_describer))
 	{
-		// Dynamically load the image_describer from the file (will restore old used settings)
 		std::ifstream stream(sImage_describer.c_str());
 		if (!stream.is_open())
 			return false;
 
-		try
-		{
+		try	{
 			cereal::JSONInputArchive archive(stream);
 			archive(cereal::make_nvp("image_describer", image_describer));
 		}
-		catch (const cereal::Exception & e)
-		{
-			std::cerr << e.what() << std::endl
-				<< "Cannot dynamically allocate the Image_describer interface." << std::endl;
+		catch (const cereal::Exception & e)	{
+			std::cerr << e.what() << std::endl	<< "Cannot dynamically allocate the Image_describer interface." << std::endl;
 			return EXIT_FAILURE;
 		}
 	}
 	else
 	{
-		// Create the desired Image_describer method.
-		// Don't use a factory, perform direct allocation
-
-		if (sImage_Describer_Method == "SIFT")
-		{
-			image_describer.reset(new SIFT_Image_describer
-			(SIFT_Image_describer::Params(), !bUpRight));
-		}
-
-		// Export the used Image_describer and region type for:
-		// - dynamic future regions computation and/or loading
+		image_describer.reset(new SIFT_Image_describer(SIFT_Image_describer::Params(), !bUpRight));
+		
 		{
 			std::ofstream stream(sImage_describer.c_str());
 			if (!stream.is_open())
@@ -201,27 +164,11 @@ int main(int argc, char **argv)
 		}
 	}
 
-	// Feature extraction routines
-	// For each View of the SfM_Data container:
-	// - if regions file exists continue,
-	// - if no file, compute features
 	{
 		system::Timer timer;
 		Image<unsigned char> imageGray, globalMask;
 
-		const std::string sGlobalMask_filename = stlplus::create_filespec(sOutDir, "mask.png");
-		if (stlplus::file_exists(sGlobalMask_filename))
-		{
-			if (ReadImage(sGlobalMask_filename.c_str(), &globalMask))
-			{
-				std::cout
-					<< "Feature extraction will use a GLOBAL MASK:\n"
-					<< sGlobalMask_filename << std::endl;
-			}
-		}
-
-		C_Progress_display my_progress_bar(sfm_data.GetViews().size(),
-			std::cout, "\n- EXTRACT FEATURES -\n");
+		C_Progress_display my_progress_bar(sfm_data.GetViews().size(), std::cout, "\n- EXTRACT FEATURES -\n");
 
 #ifdef OPENMVG_USE_OPENMP
 		const unsigned int nb_max_thread = omp_get_max_threads();
@@ -235,6 +182,7 @@ int main(int argc, char **argv)
 
 #pragma omp parallel for schedule(dynamic) if(iNumThreads > 0) private(imageGray)
 #endif
+
 		for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
 		{
 			Views::const_iterator iterViews = sfm_data.views.begin();
@@ -245,31 +193,11 @@ int main(int argc, char **argv)
 				sFeat = stlplus::create_filespec(sOutDir, stlplus::basename_part(sView_filename), "feat"),
 				sDesc = stlplus::create_filespec(sOutDir, stlplus::basename_part(sView_filename), "desc");
 
-			//If features or descriptors file are missing, compute them
-			if (bForce || !stlplus::file_exists(sFeat) || !stlplus::file_exists(sDesc))
-			{
-
+			if (bForce || !stlplus::file_exists(sFeat) || !stlplus::file_exists(sDesc))	{
 				if (!ReadImage(sView_filename.c_str(), &imageGray))
 					continue;
 
-				Image<unsigned char> * mask = nullptr; // The mask is null by default
-
-				const std::string sImageMask_filename =
-					stlplus::create_filespec(sfm_data.s_root_path,
-						stlplus::basename_part(sView_filename) + "_mask", "png");
-
-				Image<unsigned char> imageMask;
-				if (stlplus::file_exists(sImageMask_filename))
-					ReadImage(sImageMask_filename.c_str(), &imageMask);
-
-				// The mask point to the globalMask, if a valid one exists for the current image
-				if (globalMask.Width() == imageGray.Width() && globalMask.Height() == imageGray.Height())
-					mask = &globalMask;
-				// The mask point to the imageMask (individual mask) if a valid one exists for the current image
-				if (imageMask.Width() == imageGray.Width() && imageMask.Height() == imageGray.Height())
-					mask = &imageMask;
-
-				// Compute features and descriptors and export them to files
+				Image<unsigned char> * mask = nullptr; 
 				std::unique_ptr<Regions> regions;
 				image_describer->Describe(imageGray, regions, mask);
 				image_describer->Save(regions.get(), sFeat, sDesc);

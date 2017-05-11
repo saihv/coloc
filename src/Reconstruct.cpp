@@ -7,7 +7,7 @@
 
 #include <cstdlib>
 
-#include "openMVG/sfm/sfm.hpp"
+#include "reconstruction/sfm.hpp"
 #include "openMVG/system/timer.hpp"
 #include "openMVG/cameras/Cameras_Common_command_line_helper.hpp"
 
@@ -63,9 +63,9 @@ int main(int argc, char **argv)
 
 	CmdLine cmd;
 
-	std::string sSfM_Data_Filename;
-	std::string sMatchesDir;
-	std::string sOutDir = "";
+	std::string sSfM_Data_Filename = "D:\\Code\\test\\sfm_data.json";
+	std::string sMatchesDir = "D:\\Code\\test\\";
+	std::string sOutDir = "D:\\Code\\test\\reconstruct";
 	std::pair<std::string, std::string> initialPairString("", "");
 	std::string sIntrinsic_refinement_options = "ADJUST_ALL";
 	int i_User_camera_model = PINHOLE_CAMERA_RADIAL3;
@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 	cmd.add(make_switch('P', "prior_usage"));
 
 	try {
-		if (argc == 1) throw std::string("Invalid parameter.");
+		//if (argc == 1) throw std::string("Invalid parameter.");
 		cmd.process(argc, argv);
 	}
 	catch (const std::string& s) {
@@ -189,7 +189,7 @@ int main(int argc, char **argv)
 	//---------------------------------------
 
 	openMVG::system::Timer timer;
-	SequentialSfMReconstructionEngine sfmEngine(
+	SequentialReconstructionEngine sfmEngine(
 		sfm_data,
 		sOutDir,
 		stlplus::create_filespec(sOutDir, "Reconstruction_Report.html"));
