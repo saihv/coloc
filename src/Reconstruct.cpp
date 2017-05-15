@@ -7,7 +7,7 @@
 
 #include <cstdlib>
 
-#include "reconstruction/sfm.hpp"
+#include "deps/sfm.hpp"
 #include "openMVG/system/timer.hpp"
 #include "openMVG/cameras/Cameras_Common_command_line_helper.hpp"
 

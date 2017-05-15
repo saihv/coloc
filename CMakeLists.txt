@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-PROJECT(colloc C CXX)
+PROJECT(coloc C CXX)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
@@ -20,6 +20,12 @@ set(OpenMVG_DIR "D:/Github/openMVG_install/share/openMVG/cmake/")
 
 find_package (OpenMVG REQUIRED)
 find_package( Threads REQUIRED)
+
+find_package(OpenMP)
+if (OPENMP_FOUND)
+    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 include_directories(
     ${OPENMVG_INCLUDE_DIRS}
@@ -53,7 +59,7 @@ target_link_libraries(matcher
   openMVG_matching_image_collection
   stlplus)
 
-add_subdirectory(src/reconstruction)
+add_subdirectory(src/deps)
 
 add_executable(reconstructor src/Reconstruct.cpp)
 target_link_libraries(reconstructor
@@ -63,3 +69,14 @@ target_link_libraries(reconstructor
   openMVG_sfm
   coloc_sfm
   stlplus)
+
+add_executable(localizer src/Localize.cpp)
+target_link_libraries(localizer
+openMVG_system
+openMVG_image
+openMVG_features
+openMVG_matching_image_collection
+openMVG_sfm
+coloc_sfm
+easyexif
+vlsift)
