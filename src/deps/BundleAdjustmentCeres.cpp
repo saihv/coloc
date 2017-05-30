@@ -8,11 +8,13 @@
 //- Robust estimation - LMeds (since no threshold can be defined)
 #include "openMVG/robust_estimation/robust_estimator_LMeds.hpp"
 #include "openMVG/sfm/sfm_data.hpp"
-#include "sfm_data_BA_ceres.hpp"
 #include "openMVG/sfm/sfm_data_BA_ceres_camera_functor.hpp"
 #include "openMVG/sfm/sfm_data_io.hpp"
 #include "openMVG/sfm/sfm_data_transform.hpp"
 #include "openMVG/types.hpp"
+
+#include "BundleAdjustmentCeres.hpp"
+#include "BundleAdjustment.hpp"
 
 #include <ceres/ceres.h>
 #include <ceres/cost_function.h>
@@ -21,11 +23,9 @@
 
 #include <array>
 
-namespace openMVG {
-	namespace sfm {
-
 		using namespace openMVG::cameras;
 		using namespace openMVG::geometry;
+		using namespace openMVG;
 
 		// Ceres CostFunctor used for SfM pose center to GPS pose center minimization
 		struct PoseCenterConstraintCostFunction
@@ -80,19 +80,19 @@ namespace openMVG {
 			switch (intrinsic->getType())
 			{
 			case PINHOLE_CAMERA:
-				return ResidualErrorFunctor_Pinhole_Intrinsic::Create(observation, weight);
+				return sfm::ResidualErrorFunctor_Pinhole_Intrinsic::Create(observation, weight);
 				break;
 			case PINHOLE_CAMERA_RADIAL1:
-				return ResidualErrorFunctor_Pinhole_Intrinsic_Radial_K1::Create(observation, weight);
+				return sfm::ResidualErrorFunctor_Pinhole_Intrinsic_Radial_K1::Create(observation, weight);
 				break;
 			case PINHOLE_CAMERA_RADIAL3:
-				return ResidualErrorFunctor_Pinhole_Intrinsic_Radial_K3::Create(observation, weight);
+				return sfm::ResidualErrorFunctor_Pinhole_Intrinsic_Radial_K3::Create(observation, weight);
 				break;
 			case PINHOLE_CAMERA_BROWN:
-				return ResidualErrorFunctor_Pinhole_Intrinsic_Brown_T2::Create(observation, weight);
+				return sfm::ResidualErrorFunctor_Pinhole_Intrinsic_Brown_T2::Create(observation, weight);
 				break;
 			case PINHOLE_CAMERA_FISHEYE:
-				return ResidualErrorFunctor_Pinhole_Intrinsic_Fisheye::Create(observation, weight);
+				return sfm::ResidualErrorFunctor_Pinhole_Intrinsic_Fisheye::Create(observation, weight);
 			default:
 				return nullptr;
 			}
@@ -156,7 +156,7 @@ namespace openMVG {
 
 		bool Bundle_Adjustment_Ceres::Adjust
 		(
-			SfM_Data & sfm_data,     // the SfM scene to refine
+			sfm::SfM_Data & sfm_data,     // the SfM scene to refine
 			const Optimize_Options options
 		)
 		{
@@ -336,12 +336,12 @@ namespace openMVG {
 			// For all visibility add reprojections errors:
 			for (auto & structure_landmark_it : sfm_data.structure)
 			{
-				const Observations & obs = structure_landmark_it.second.obs;
+				const sfm::Observations & obs = structure_landmark_it.second.obs;
 
 				for (const auto & obs_it : obs)
 				{
 					// Build the residual block corresponding to the track observation:
-					const View * view = sfm_data.views.at(obs_it.first).get();
+					const sfm::View * view = sfm_data.views.at(obs_it.first).get();
 
 					// Each Residual block takes a point and a camera as input and outputs a 2
 					// dimensional residual. Internally, the cost function stores the observed
@@ -366,12 +366,12 @@ namespace openMVG {
 				// - fixed 3D points with weighted observations
 				for (auto & gcp_landmark_it : sfm_data.control_points)
 				{
-					const Observations & obs = gcp_landmark_it.second.obs;
+					const sfm::Observations & obs = gcp_landmark_it.second.obs;
 
 					for (const auto & obs_it : obs)
 					{
 						// Build the residual block corresponding to the track observation:
-						const View * view = sfm_data.views.at(obs_it.first).get();
+						const sfm::View * view = sfm_data.views.at(obs_it.first).get();
 
 						// Each Residual block takes a point and a camera as input and outputs a 2
 						// dimensional residual. Internally, the cost function stores the observed
@@ -548,6 +548,3 @@ namespace openMVG {
 				return true;
 			}
 		}
-
-	} // namespace sfm
-} // namespace openMVG

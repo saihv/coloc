@@ -159,11 +159,11 @@ int main(int argc, char **argv)
     std::sort(vec_image.begin(), vec_image.end());
 
     // Configure an empty scene with Views and their corresponding cameras
-    SfM_Data sfm_data;
-    sfm_data.s_root_path = sImageDir; // Setup main image root_path
-    Views & views = sfm_data.views;
-    Intrinsics & intrinsics = sfm_data.intrinsics;
-    Poses & poses = sfm_data.poses;
+    SfM_Data SfM_Data;
+    SfM_Data.s_root_path = sImageDir; // Setup main image root_path
+    Views & views = SfM_Data.views;
+    Intrinsics & intrinsics = SfM_Data.intrinsics;
+    Poses & poses = SfM_Data.poses;
 
     std::ostringstream error_report_stream;
     for ( std::vector<std::string>::const_iterator iter_image = vec_image.begin();  iter_image != vec_image.end(); ++iter_image)
@@ -234,16 +234,16 @@ int main(int argc, char **argv)
 
     // Group camera that share common properties if desired (leads to more faster & stable BA).
     if (b_Group_camera_model)
-        GroupSharedIntrinsics(sfm_data);
+        GroupSharedIntrinsics(SfM_Data);
 
     // Store SfM_Data views & intrinsic data
-    if (!Save(sfm_data, stlplus::create_filespec( sOutputDir, "sfm_data.json" ).c_str(), ESfM_Data(VIEWS|EXTRINSICS|INTRINSICS)))
+    if (!Save(SfM_Data, stlplus::create_filespec( sOutputDir, "SfM_Data.json" ).c_str(), ESfM_Data(VIEWS|EXTRINSICS|INTRINSICS)))
         return EXIT_FAILURE;
 
     std::cout << std::endl
     << "Image listing:\n"
     << "Files found: " << vec_image.size() << "\n"
-    << "Files enumerated: " << sfm_data.GetViews().size() << std::endl;
+    << "Files enumerated: " << SfM_Data.GetViews().size() << std::endl;
 
     return EXIT_SUCCESS;
 }

@@ -5,10 +5,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include "openMVG/sfm/sfm_data.hpp"
-#include "openMVG/sfm/sfm_data_io.hpp"
+#include "openMVG/sfm/SfM_Data.hpp"
+#include "openMVG/sfm/SfM_Data_io.hpp"
 #include "openMVG/sfm/pipelines/sfm_engine.hpp"
-#include "openMVG/sfm/pipelines/sfm_features_provider.hpp"
+#include "openMVG/sfm/pipelines/sfm_FProviderStruct.hpp"
 #include "openMVG/sfm/pipelines/sfm_regions_provider.hpp"
 #include "openMVG/sfm/pipelines/sfm_regions_provider_cache.hpp"
 
@@ -195,8 +195,8 @@ int main(int argc, char **argv)
 	//---------------------------------------
 	// Read SfM Scene (image view & intrinsics data)
 	//---------------------------------------
-	SfM_Data sfm_data;
-	if (!Load(sfm_data, sSfM_Data_Filename, ESfM_Data(VIEWS | INTRINSICS))) {
+	SfM_Data SfM_Data;
+	if (!Load(SfM_Data, sSfM_Data_Filename, ESfM_Data(VIEWS | INTRINSICS))) {
 		std::cerr << std::endl
 			<< "The input SfM_Data file \"" << sSfM_Data_Filename << "\" cannot be read." << std::endl;
 		return EXIT_FAILURE;
@@ -235,7 +235,7 @@ int main(int argc, char **argv)
 		regions_provider = std::make_shared<Regions_Provider_Cache>(ui_max_cache_size);
 	}
 
-	if (!regions_provider->load(sfm_data, sMatchesDirectory, regions_type)) {
+	if (!regions_provider->load(SfM_Data, sMatchesDirectory, regions_type)) {
 		std::cerr << std::endl << "Invalid regions." << std::endl;
 		return EXIT_FAILURE;
 	}
@@ -247,14 +247,14 @@ int main(int argc, char **argv)
 	std::vector<std::string> vec_fileNames;
 	std::vector<std::pair<size_t, size_t> > vec_imagesSize;
 	{
-		vec_fileNames.reserve(sfm_data.GetViews().size());
-		vec_imagesSize.reserve(sfm_data.GetViews().size());
-		for (Views::const_iterator iter = sfm_data.GetViews().begin();
-			iter != sfm_data.GetViews().end();
+		vec_fileNames.reserve(SfM_Data.GetViews().size());
+		vec_imagesSize.reserve(SfM_Data.GetViews().size());
+		for (Views::const_iterator iter = SfM_Data.GetViews().begin();
+			iter != SfM_Data.GetViews().end();
 			++iter)
 		{
 			const View * v = iter->second.get();
-			vec_fileNames.push_back(stlplus::create_filespec(sfm_data.s_root_path,
+			vec_fileNames.push_back(stlplus::create_filespec(SfM_Data.s_root_path,
 				v->s_Img_path));
 			vec_imagesSize.push_back(std::make_pair(v->ui_width, v->ui_height));
 		}
@@ -346,17 +346,17 @@ int main(int argc, char **argv)
 			Pair_Set pairs;
 			switch (ePairmode)
 			{
-			case PAIR_EXHAUSTIVE: pairs = exhaustivePairs(sfm_data.GetViews().size()); break;
-			case PAIR_CONTIGUOUS: pairs = contiguousWithOverlap(sfm_data.GetViews().size(), iMatchingVideoMode); break;
+			case PAIR_EXHAUSTIVE: pairs = exhaustivePairs(SfM_Data.GetViews().size()); break;
+			case PAIR_CONTIGUOUS: pairs = contiguousWithOverlap(SfM_Data.GetViews().size(), iMatchingVideoMode); break;
 			case PAIR_FROM_FILE:
-				if (!loadPairs(sfm_data.GetViews().size(), sPredefinedPairList, pairs))
+				if (!loadPairs(SfM_Data.GetViews().size(), sPredefinedPairList, pairs))
 				{
 					return EXIT_FAILURE;
 				}
 				break;
 			}
 			// Photometric matching of putative pairs
-			collectionMatcher->Match(sfm_data, regions_provider, pairs, map_PutativesMatches);
+			collectionMatcher->Match(SfM_Data, regions_provider, pairs, map_PutativesMatches);
 			//---------------------------------------
 			//-- Export putative matches
 			//---------------------------------------
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
 	//-- export view pair graph once putative graph matches have been computed
 	{
 		std::set<IndexT> set_ViewIds;
-		std::transform(sfm_data.GetViews().begin(), sfm_data.GetViews().end(),
+		std::transform(SfM_Data.GetViews().begin(), SfM_Data.GetViews().end(),
 			std::inserter(set_ViewIds, set_ViewIds.begin()), stl::RetrieveKey());
 		graph::indexedGraph putativeGraph(set_ViewIds, getPairs(map_PutativesMatches));
 		graph::exportToGraphvizData(
@@ -392,7 +392,7 @@ int main(int argc, char **argv)
 	//---------------------------------------
 
 	std::unique_ptr<ImageCollectionGeometricFilter> filter_ptr(
-		new ImageCollectionGeometricFilter(&sfm_data, regions_provider));
+		new ImageCollectionGeometricFilter(&SfM_Data, regions_provider));
 
 	if (filter_ptr)
 	{
@@ -471,7 +471,7 @@ int main(int argc, char **argv)
 		//-- export view pair graph once geometric filter have been done
 		{
 			std::set<IndexT> set_ViewIds;
-			std::transform(sfm_data.GetViews().begin(), sfm_data.GetViews().end(),
+			std::transform(SfM_Data.GetViews().begin(), SfM_Data.GetViews().end(),
 				std::inserter(set_ViewIds, set_ViewIds.begin()), stl::RetrieveKey());
 			graph::indexedGraph putativeGraph(set_ViewIds, getPairs(map_GeometricMatches));
 			graph::exportToGraphvizData(

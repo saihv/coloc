@@ -9,11 +9,9 @@
 #define OPENMVG_SFM_PIPELINES_LOCALIZATION_SFM_LOCALIZER_STO_DB_HPP
 
 #include "openMVG/matching/regions_matcher.hpp"
-#include "openMVG/sfm/pipelines/localization/SfM_Localizer.hpp"
+#include "Localizer.hpp"
 
-namespace openMVG {
-namespace sfm {
-
+using namespace openMVG;
 // Implementation of a naive method:
 // - init the database of descriptor from the structure and the observations.
 // - create a large array with all the used descriptors and init a Matcher with it
@@ -35,8 +33,8 @@ public:
   */
   bool Init
   (
-    const SfM_Data & sfm_data,
-    const Regions_Provider & regions_provider
+    const sfm::SfM_Data & sfm_data,
+    const sfm::Regions_Provider & regions_provider
   );
 
   /**
@@ -60,7 +58,7 @@ public:
 
 private:
   // Reference to the scene
-  const SfM_Data * sfm_data_;
+  const sfm::SfM_Data * sfm_data_;
   /// Association of a regions to a landmark observation
   std::unique_ptr<features::Regions> landmark_observations_descriptors_;
   /// Association of a track observation to a track Id (used for retrieval)
@@ -69,8 +67,5 @@ private:
   ///  and 3D points observation descriptors
   std::unique_ptr<matching::Matcher_Regions_Database> matching_interface_;
 };
-
-} // namespace sfm
-} // namespace openMVG
 
 #endif // OPENMVG_SFM_PIPELINES_LOCALIZATION_SFM_LOCALIZER_STO_DB_HPP

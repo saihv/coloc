@@ -122,8 +122,8 @@ int main(int argc, char **argv)
 		}
 	}
 
-	SfM_Data sfm_data;
-	if (!Load(sfm_data, sSfM_Data_Filename, ESfM_Data(VIEWS | INTRINSICS))) {
+	SfM_Data SfM_Data;
+	if (!Load(SfM_Data, sSfM_Data_Filename, ESfM_Data(VIEWS | INTRINSICS))) {
 		std::cerr << std::endl	<< "The input file \"" << sSfM_Data_Filename << "\" cannot be read" << std::endl;
 		return false;
 	}
@@ -168,7 +168,7 @@ int main(int argc, char **argv)
 		system::Timer timer;
 		Image<unsigned char> imageGray, globalMask;
 
-		C_Progress_display my_progress_bar(sfm_data.GetViews().size(), std::cout, "\n- EXTRACT FEATURES -\n");
+		C_Progress_display my_progress_bar(SfM_Data.GetViews().size(), std::cout, "\n- EXTRACT FEATURES -\n");
 
 #ifdef OPENMVG_USE_OPENMP
 		const unsigned int nb_max_thread = omp_get_max_threads();
@@ -183,13 +183,13 @@ int main(int argc, char **argv)
 #pragma omp parallel for schedule(dynamic) if(iNumThreads > 0) private(imageGray)
 #endif
 
-		for (int i = 0; i < static_cast<int>(sfm_data.views.size()); ++i)
+		for (int i = 0; i < static_cast<int>(SfM_Data.views.size()); ++i)
 		{
-			Views::const_iterator iterViews = sfm_data.views.begin();
+			Views::const_iterator iterViews = SfM_Data.views.begin();
 			std::advance(iterViews, i);
 			const View * view = iterViews->second.get();
 			const std::string
-				sView_filename = stlplus::create_filespec(sfm_data.s_root_path, view->s_Img_path),
+				sView_filename = stlplus::create_filespec(SfM_Data.s_root_path, view->s_Img_path),
 				sFeat = stlplus::create_filespec(sOutDir, stlplus::basename_part(sView_filename), "feat"),
 				sDesc = stlplus::create_filespec(sOutDir, stlplus::basename_part(sView_filename), "desc");
 

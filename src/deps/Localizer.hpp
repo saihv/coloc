@@ -4,32 +4,19 @@
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-#ifndef OPENMVG_SFM_PIPELINES_LOCALIZATION_SFM_LOCALIZER_HPP
-#define OPENMVG_SFM_PIPELINES_LOCALIZATION_SFM_LOCALIZER_HPP
-
+#pragma once
 #include "openMVG/numeric/numeric.h"
 #include "openMVG/types.hpp"
+#include "openMVG/sfm/pipelines/sfm_regions_provider.hpp"
 
-namespace openMVG {
+class openMVG::features::Regions;
+class openMVG::geometry::Pose3;
+struct openMVG::cameras::IntrinsicBase;
 
-namespace features {
-  class Regions;
-} // namespace features
+using namespace openMVG;
 
-namespace geometry {
-  class Pose3;
-} // namespace geometry
-
-
-namespace cameras {
-  struct IntrinsicBase;
-} // namespace cameras 
-
-namespace sfm {
-
-struct SfM_Data;
-struct Regions_Provider;
+struct sfm::SfM_Data;
+struct sfm::Regions_Provider;
 
 struct Image_Localizer_Match_Data
 {
@@ -116,8 +103,3 @@ public:
     bool b_refine_intrinsic
   );
 };
-
-} // namespace sfm
-} // namespace openMVG
-
-#endif // OPENMVG_SFM_PIPELINES_LOCALIZATION_SFM_LOCALIZER_HPP

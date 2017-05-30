@@ -5,7 +5,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#include "openMVG/sfm/pipelines/localization/SfM_Localizer.hpp"
+#include "Localizer.hpp"
+#include "BundleAdjustmentCeres.hpp"
 
 #include "openMVG/cameras/cameras.hpp"
 #include "openMVG/multiview/solver_resection_kernel.hpp"
@@ -13,11 +14,8 @@
 #include "openMVG/robust_estimation/robust_estimator_ACRansac.hpp"
 #include "openMVG/robust_estimation/robust_estimator_ACRansacKernelAdaptator.hpp"
 #include "openMVG/sfm/sfm_data.hpp"
-#include "openMVG/sfm/sfm_data_BA_ceres.hpp"
 
-
-namespace openMVG {
-namespace sfm {
+using namespace openMVG;
 
   struct ResectionSquaredResidualError {
     // Compute the residual of the projection distance(pt2D, Project(P,pt3D))
@@ -133,9 +131,9 @@ namespace sfm {
     }
 
     // Setup a tiny SfM scene with the corresponding 2D-3D data
-    SfM_Data sfm_data;
+    sfm::SfM_Data sfm_data;
     // view
-    sfm_data.views.insert(std::make_pair(0, std::make_shared<View>("",0, 0, 0)));
+    sfm_data.views.insert(std::make_pair(0, std::make_shared<sfm::View>("",0, 0, 0)));
     // pose
     sfm_data.poses[0] = pose;
     // intrinsic
@@ -145,9 +143,9 @@ namespace sfm {
     for (size_t i = 0; i < matching_data.vec_inliers.size(); ++i)
     {
       const size_t idx = matching_data.vec_inliers[i];
-      Landmark landmark;
+	  sfm::Landmark landmark;
       landmark.X = matching_data.pt3D.col(idx);
-      landmark.obs[0] = Observation(matching_data.pt2D.col(idx), UndefinedIndexT);
+      landmark.obs[0] = sfm::Observation(matching_data.pt2D.col(idx), UndefinedIndexT);
       sfm_data.structure[i] = std::move(landmark);
     }
 
@@ -171,6 +169,3 @@ namespace sfm {
 
     return b_BA_Status;
   }
-
-} // namespace sfm
-} // namespace openMVG

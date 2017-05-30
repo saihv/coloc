@@ -7,20 +7,21 @@
 
 #include <cstdlib>
 
-#include "deps/sfm.hpp"
+#include "deps/Localizer.hpp"
+#include "deps/BundleAdjustmentCeres.hpp"
+#include "deps/SequentialReconstruction.hpp"
 #include "openMVG/system/timer.hpp"
 #include "openMVG/cameras/Cameras_Common_command_line_helper.hpp"
-
+#include "openMVG/sfm/sfm_data_io.hpp"
+#include "openMVG/sfm/sfm_report.hpp"
 #include "third_party/cmdLine/cmdLine.h"
 #include "third_party/stlplus3/filesystemSimplified/file_system.hpp"
 
 using namespace openMVG;
-using namespace openMVG::cameras;
-using namespace openMVG::sfm;
 
 /// From 2 given image file-names, find the two corresponding index in the View list
 bool computeIndexFromImageNames(
-	const SfM_Data & sfm_data,
+	const sfm::SfM_Data & SfM_Data,
 	const std::pair<std::string, std::string>& initialPairName,
 	Pair& initialPairIndex)
 {
@@ -33,10 +34,10 @@ bool computeIndexFromImageNames(
 	initialPairIndex = Pair(UndefinedIndexT, UndefinedIndexT);
 
 	/// List views filenames and find the one that correspond to the user ones:
-	for (Views::const_iterator it = sfm_data.GetViews().begin();
-		it != sfm_data.GetViews().end(); ++it)
+	for (sfm::Views::const_iterator it = SfM_Data.GetViews().begin();
+		it != SfM_Data.GetViews().end(); ++it)
 	{
-		const View * v = it->second.get();
+		const sfm::View * v = it->second.get();
 		const std::string filename = stlplus::filename_part(v->s_Img_path);
 		if (filename == initialPairName.first)
 		{
@@ -63,7 +64,7 @@ int main(int argc, char **argv)
 
 	CmdLine cmd;
 
-	std::string sSfM_Data_Filename = "D:\\Code\\test\\sfm_data.json";
+	std::string sSfM_Data_Filename = "D:\\Code\\test\\SfM_Data.json";
 	std::string sMatchesDir = "D:\\Code\\test\\";
 	std::string sOutDir = "D:\\Code\\test\\reconstruct";
 	std::pair<std::string, std::string> initialPairString("", "");
@@ -133,8 +134,8 @@ int main(int argc, char **argv)
 	}
 
 	// Load input SfM_Data scene
-	SfM_Data sfm_data;
-	if (!Load(sfm_data, sSfM_Data_Filename, ESfM_Data(VIEWS | INTRINSICS))) {
+	sfm::SfM_Data SfM_Data;
+	if (!sfm::Load(SfM_Data, sSfM_Data_Filename, sfm::ESfM_Data(sfm::VIEWS | sfm::INTRINSICS))) {
 		std::cerr << std::endl
 			<< "The input SfM_Data file \"" << sSfM_Data_Filename << "\" cannot be read." << std::endl;
 		return EXIT_FAILURE;
@@ -152,18 +153,18 @@ int main(int argc, char **argv)
 	}
 
 	// Features reading
-	std::shared_ptr<Features_Provider> feats_provider = std::make_shared<Features_Provider>();
-	if (!feats_provider->load(sfm_data, sMatchesDir, regions_type)) {
+	std::shared_ptr<sfm::Features_Provider> feats_provider = std::make_shared<sfm::Features_Provider>();
+	if (!feats_provider->load(SfM_Data, sMatchesDir, regions_type)) {
 		std::cerr << std::endl
 			<< "Invalid features." << std::endl;
 		return EXIT_FAILURE;
 	}
 	// Matches reading
-	std::shared_ptr<Matches_Provider> matches_provider = std::make_shared<Matches_Provider>();
+	std::shared_ptr<sfm::Matches_Provider> MProviderStruct = std::make_shared<sfm::Matches_Provider>();
 	if // Try to read the two matches file formats
 		(
-			!(matches_provider->load(sfm_data, stlplus::create_filespec(sMatchesDir, "matches.f.txt")) ||
-				matches_provider->load(sfm_data, stlplus::create_filespec(sMatchesDir, "matches.f.bin")))
+			!(MProviderStruct->load(SfM_Data, stlplus::create_filespec(sMatchesDir, "matches.f.txt")) ||
+				MProviderStruct->load(SfM_Data, stlplus::create_filespec(sMatchesDir, "matches.f.bin")))
 			)
 	{
 		std::cerr << std::endl
@@ -189,14 +190,14 @@ int main(int argc, char **argv)
 	//---------------------------------------
 
 	openMVG::system::Timer timer;
-	SequentialReconstructionEngine sfmEngine(
-		sfm_data,
+	Reconstruction sfmEngine(
+		SfM_Data,
 		sOutDir,
 		stlplus::create_filespec(sOutDir, "Reconstruction_Report.html"));
 
-	// Configure the features_provider & the matches_provider
+	// Configure the FProviderStruct & the MProviderStruct
 	sfmEngine.SetFeaturesProvider(feats_provider.get());
-	sfmEngine.SetMatchesProvider(matches_provider.get());
+	sfmEngine.SetMatchesProvider(MProviderStruct.get());
 
 	// Configure reconstruction parameters
 	sfmEngine.Set_Intrinsics_Refinement_Type(intrinsic_refinement_options);
@@ -208,7 +209,7 @@ int main(int argc, char **argv)
 	if (!initialPairString.first.empty() && !initialPairString.second.empty())
 	{
 		Pair initialPairIndex;
-		if (!computeIndexFromImageNames(sfm_data, initialPairString, initialPairIndex))
+		if (!computeIndexFromImageNames(SfM_Data, initialPairString, initialPairIndex))
 		{
 			std::cerr << "Could not find the initial pairs <" << initialPairString.first
 				<< ", " << initialPairString.second << ">!\n";
@@ -222,18 +223,18 @@ int main(int argc, char **argv)
 		std::cout << std::endl << " Total Ac-Sfm took (s): " << timer.elapsed() << std::endl;
 
 		std::cout << "...Generating SfM_Report.html" << std::endl;
-		Generate_SfM_Report(sfmEngine.Get_SfM_Data(),
+		sfm::Generate_SfM_Report(sfmEngine.Get_SfM_Data(),
 			stlplus::create_filespec(sOutDir, "SfMReconstruction_Report.html"));
 
 		//-- Export to disk computed scene (data & visualizable results)
 		std::cout << "...Export SfM_Data to disk." << std::endl;
 		Save(sfmEngine.Get_SfM_Data(),
-			stlplus::create_filespec(sOutDir, "sfm_data", ".bin"),
-			ESfM_Data(ALL));
+			stlplus::create_filespec(sOutDir, "SfM_Data", ".bin"),
+			sfm::ESfM_Data(sfm::ALL));
 
 		Save(sfmEngine.Get_SfM_Data(),
 			stlplus::create_filespec(sOutDir, "cloud_and_poses", ".ply"),
-			ESfM_Data(ALL));
+			sfm::ESfM_Data(sfm::ALL));
 
 		return EXIT_SUCCESS;
 	}

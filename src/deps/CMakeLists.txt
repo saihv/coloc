@@ -9,7 +9,7 @@ file(
   *.cpp
 )
 
-set(OpenMVG_DIR "D:/Github/openMVG_install/share/openMVG/cmake/")
+set(OpenMVG_DIR "E:/Code/Libraries/openMVG_install/share/openMVG/cmake/")
 
 find_package (OpenMVG REQUIRED)
 

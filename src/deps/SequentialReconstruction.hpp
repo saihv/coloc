@@ -5,35 +5,33 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-#ifndef OPENMVG_SFM_LOCALIZATION_SEQUENTIAL_SFM_HPP
-#define OPENMVG_SFM_LOCALIZATION_SEQUENTIAL_SFM_HPP
-
 #include "openMVG/sfm/pipelines/sfm_engine.hpp"
 #include "openMVG/tracks/tracks.hpp"
+#include "openMVG/sfm/pipelines/sfm_features_provider.hpp"
+#include "openMVG/sfm/pipelines/sfm_matches_provider.hpp"
 
 #include "third_party/htmlDoc/htmlDoc.hpp"
 #include "third_party/histogram/histogram.hpp"
 
-namespace openMVG {
-namespace sfm {
+using namespace openMVG;
 
-struct Features_Provider;
-struct Matches_Provider;
+struct sfm::Features_Provider;
+struct sfm::Matches_Provider;
 
 /// Sequential SfM Pipeline Reconstruction Engine.
-class SequentialReconstructionEngine : public ReconstructionEngine
+class Reconstruction : public sfm::ReconstructionEngine
 {
 public:
 
-  SequentialReconstructionEngine(
-    const SfM_Data & sfm_data,
+  Reconstruction(
+    const sfm::SfM_Data & sfm_data,
     const std::string & soutDirectory,
     const std::string & loggingFile = "");
 
-  ~SequentialReconstructionEngine();
+  ~Reconstruction();
 
-  void SetFeaturesProvider(Features_Provider * provider);
-  void SetMatchesProvider(Matches_Provider * provider);
+  void SetFeaturesProvider(sfm::Features_Provider * provider);
+  void SetMatchesProvider(sfm::Matches_Provider * provider);
 
   virtual bool Process();
 
@@ -98,17 +96,13 @@ private:
   cameras::EINTRINSIC cam_type_; // The camera type for the unknown cameras
 
   //-- Data provider
-  Features_Provider  * features_provider_;
-  Matches_Provider  * matches_provider_;
+  sfm::Features_Provider  * fprovider;
+  sfm::Matches_Provider  * mprovider;
 
   // Temporary data
-  openMVG::tracks::STLMAPTracks map_tracks_; // putative landmark tracks (visibility per 3D point)
+  tracks::STLMAPTracks map_tracks_; // putative landmark tracks (visibility per 3D point)
   Hash_Map<IndexT, double> map_ACThreshold_; // Per camera confidence (A contrario estimated threshold error)
 
   std::set<uint32_t> set_remaining_view_id_;     // Remaining camera index that can be used for resection
 };
 
-} // namespace sfm
-} // namespace openMVG
-
-#endif // OPENMVG_SFM_LOCALIZATION_SEQUENTIAL_SFM_HPP
