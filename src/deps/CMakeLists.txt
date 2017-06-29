@@ -9,7 +9,7 @@ file(
   *.cpp
 )
 
-set(OpenMVG_DIR "E:/Code/Libraries/openMVG_install/share/openMVG/cmake/")
+set(OpenMVG_DIR "/home/sai/software/installMVG/share/openMVG/cmake")
 
 find_package (OpenMVG REQUIRED)
 
@@ -18,12 +18,14 @@ include_directories(
     ${Eigen_INCLUDE_DIRS}
 )
 
-
 add_library(coloc_sfm ${sfm_files_header} ${sfm_files_cpp})
 target_link_libraries(coloc_sfm
+  openMVG_sfm
   openMVG_multiview
   stlplus
-  ${CERES_LIBRARIES}
+  ceres
+  cxsparse
+  glog
   openMVG_lInftyComputerVision
   openMVG_system
   openMVG_matching

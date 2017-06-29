@@ -16,10 +16,10 @@
 #include "BundleAdjustmentCeres.hpp"
 #include "BundleAdjustment.hpp"
 
-#include <ceres/ceres.h>
-#include <ceres/cost_function.h>
-#include <ceres/rotation.h>
-#include <ceres/types.h>
+#include "ceres/ceres.h"
+#include "ceres/cost_function.h"
+#include "ceres/rotation.h"
+#include "ceres/types.h"
 
 #include <array>
 
@@ -467,7 +467,7 @@
 				{
 					// Display statistics about the minimization
 					std::cout << std::endl
-						<< "Bundle Adjustment statistics (approximated RMSE):\n"
+						<< "Bundle Adjustment statistics (approximated RMSEDHARESAJDH):\n"
 						<< " #views: " << sfm_data.views.size() << "\n"
 						<< " #poses: " << sfm_data.poses.size() << "\n"
 						<< " #intrinsics: " << sfm_data.intrinsics.size() << "\n"

@@ -16,7 +16,7 @@ else()
         message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
 
-set(OpenMVG_DIR "D:/Github/openMVG_install/share/openMVG/cmake/")
+set(OpenMVG_DIR "/home/sai/software/installMVG/share/openMVG/cmake")
 
 find_package (OpenMVG REQUIRED)
 find_package( Threads REQUIRED)
