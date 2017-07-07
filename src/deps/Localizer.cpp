@@ -157,6 +157,7 @@ using namespace openMVG;
       Structure_Parameter_Type::NONE // STRUCTURE must remain constant
     );
     Bundle_Adjustment_Ceres bundle_adjustment_obj;
+    std::array<double, 36> covariance;
     const bool b_BA_Status = bundle_adjustment_obj.Adjust(
       sfm_data,
       ba_refine_options);

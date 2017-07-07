@@ -11,6 +11,7 @@
 #include "deps/LocalizerTracker.hpp"
 #include <openMVG/features/features.hpp>
 #include <nonFree/sift/SIFT_describer.hpp>
+#include <openMVG/features/cudasift/image_describer_cudasift.hpp>
 #include <openMVG/image/image.hpp>
 #include "deps/SfMPlyHelper.hpp"
 #include "openMVG/sfm/sfm_data_io.hpp"
@@ -58,10 +59,7 @@ int main(int argc, char **argv)
   double dMaxResidualError = std::numeric_limits<double>::infinity();
   bool bUseSingleIntrinsics = false;
   bool bExportStructure = false;
-
-#ifdef OPENMVG_USE_OPENMP
   int iNumThreads = 0;
-#endif
 
   cmd.add( make_option('i', sSfM_Data_Filename, "input_file") );
   cmd.add( make_option('m', sMatchesDir, "match_dir") );
@@ -71,9 +69,7 @@ int main(int argc, char **argv)
   cmd.add( make_option('r', dMaxResidualError, "residual_error"));
   cmd.add( make_switch('s', "single_intrinsics"));
   cmd.add( make_switch('e', "export_structure"));
-#ifdef OPENMVG_USE_OPENMP
   cmd.add( make_option('n', iNumThreads, "numThreads") );
-#endif
 
 
   try {
@@ -97,9 +93,7 @@ int main(int argc, char **argv)
     << "  (OFF by default)\n"
     << "[-e|--export_structure] (switch) when switched on, the program will also export structure to output SfM_Data.\n"
     << "  if OFF only VIEWS, INTRINSICS and EXTRINSICS are exported (OFF by default)\n"
-#ifdef OPENMVG_USE_OPENMP
     << "[-n|--numThreads] number of thread(s)\n"
-#endif
     << std::endl;
 
     std::cerr << s << std::endl;
@@ -266,11 +260,10 @@ int main(int argc, char **argv)
 
   int total_num_images = 0;
 
-#ifdef OPENMVG_USE_OPENMP
   const unsigned int nb_max_thread = (iNumThreads == 0) ? 0 : omp_get_max_threads();
     omp_set_num_threads(nb_max_thread);
     #pragma omp parallel for schedule(dynamic)
-#endif
+
   for (int i = 0; i < static_cast<int>(vec_image_new.size()); ++i)
   {
     std::vector<std::string>::const_iterator iter_image = vec_image_new.begin();
@@ -301,16 +294,16 @@ int main(int argc, char **argv)
         sDesc = stlplus::create_filespec(sMatchesOutDir, stlplus::basename_part(sView_filename.c_str()), "desc");
 
       // Compute features and descriptors and save them if they don't exist yet
-      if (!stlplus::file_exists(sFeat) || !stlplus::file_exists(sDesc))
-      {
+      //if (!stlplus::file_exists(sFeat) || !stlplus::file_exists(sDesc))
+      //{
         image_describer->Describe(imageGray, query_regions);
         image_describer->Save(query_regions.get(), sFeat, sDesc);
         std::cout << "#regions detected in query image: " << query_regions->RegionCount() << std::endl;
-      }
-      else // load already existing regions
-      {
-        query_regions->Load(sFeat,sDesc);
-      }
+      //}
+      //else // load already existing regions
+      //{
+      //  query_regions->Load(sFeat,sDesc);
+      // }
     }
 
     std::shared_ptr<cameras::IntrinsicBase> optional_intrinsic(nullptr);
@@ -373,9 +366,9 @@ int main(int argc, char **argv)
       bSuccessfulLocalization = true;
 
     }
-#ifdef OPENMVG_USE_OPENMP
+
     #pragma omp critical
-#endif
+
 {
     total_num_images++;
 

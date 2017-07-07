@@ -438,19 +438,34 @@
 			ceres::Solver::Summary summary;
 			ceres::Solve(ceres_config_options, &problem, &summary);
 			/*
-			covariance.Compute(covariance_blocks, &problem);
-
+			try {
+			if (covariance.Compute(covariance_blocks, &problem)) {
 			std::vector<std::array<double, 6 * 6>> covariance_pose;
 
 			for (auto pose_param : pose_parameter)
 			{
 				std::array<double, 6 * 6> covpose;
+				
 				double cov_pose[36];
 				covariance.GetCovarianceBlock(pose_param, pose_param, cov_pose);
 				std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
+
+
+				for (int i = 0 ; i < 36 ; i++)
+				{
+					std::cout << cov_pose[i] << "\t" << std::endl;
+				}
 				covariance_pose.push_back(covpose);
 			}
+			}
+			}
+			catch(const std::exception& e)
+			{
+				std::cout << "Unable to compute covariance" << std::endl;
+			}
 			*/
+			
+			
 			if (ceres_options_.bCeres_summary_)
 				std::cout << summary.FullReport() << std::endl;
 
@@ -467,7 +482,7 @@
 				{
 					// Display statistics about the minimization
 					std::cout << std::endl
-						<< "Bundle Adjustment statistics (approximated RMSEDHARESAJDH):\n"
+						<< "Bundle Adjustment statistics (approximated RMSE):\n"
 						<< " #views: " << sfm_data.views.size() << "\n"
 						<< " #poses: " << sfm_data.poses.size() << "\n"
 						<< " #intrinsics: " << sfm_data.intrinsics.size() << "\n"
@@ -479,8 +494,6 @@
 						<< std::endl;
 					if (options.use_motion_priors_opt)
 						std::cout << "Usable motion priors: " << (int)b_usable_prior << std::endl;
-
-					getchar();
 				}
 
 				// Update camera poses with refined data

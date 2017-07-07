@@ -597,7 +597,7 @@ bool Reconstruction::MakeInitialPair3D(const Pair & current_pair)
         (
 			Intrinsic_Parameter_Type::NONE, // Keep intrinsic constant
 			Extrinsic_Parameter_Type::ADJUST_ALL, // Adjust camera motion
-			Structure_Parameter_Type::ADJUST_ALL) // Adjust structure
+			Structure_Parameter_Type::NONE) // Adjust structure
         )
       )
     {
