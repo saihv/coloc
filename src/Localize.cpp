@@ -294,16 +294,16 @@ int main(int argc, char **argv)
         sDesc = stlplus::create_filespec(sMatchesOutDir, stlplus::basename_part(sView_filename.c_str()), "desc");
 
       // Compute features and descriptors and save them if they don't exist yet
-      //if (!stlplus::file_exists(sFeat) || !stlplus::file_exists(sDesc))
-      //{
+      if (!stlplus::file_exists(sFeat) || !stlplus::file_exists(sDesc))
+      {
         image_describer->Describe(imageGray, query_regions);
         image_describer->Save(query_regions.get(), sFeat, sDesc);
         std::cout << "#regions detected in query image: " << query_regions->RegionCount() << std::endl;
-      //}
-      //else // load already existing regions
-      //{
-      //  query_regions->Load(sFeat,sDesc);
-      // }
+      }
+      else // load already existing regions
+      {
+        query_regions->Load(sFeat,sDesc);
+      }
     }
 
     std::shared_ptr<cameras::IntrinsicBase> optional_intrinsic(nullptr);

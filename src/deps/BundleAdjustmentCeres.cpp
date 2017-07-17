@@ -22,6 +22,7 @@
 #include "ceres/types.h"
 
 #include <array>
+#include <fstream>
 
 		using namespace openMVG::cameras;
 		using namespace openMVG::geometry;
@@ -437,34 +438,33 @@
 			// Solve BA
 			ceres::Solver::Summary summary;
 			ceres::Solve(ceres_config_options, &problem, &summary);
-			/*
+
+			std::ofstream outputFile;
+			outputFile.open("/home/sai/program3data.txt", std::ofstream::out | std::ofstream::app);
+			
 			try {
-			if (covariance.Compute(covariance_blocks, &problem)) {
-			std::vector<std::array<double, 6 * 6>> covariance_pose;
+				if (covariance.Compute(covariance_blocks, &problem)) {
+					std::vector<std::array<double, 6 * 6>> covariance_pose;
 
-			for (auto pose_param : pose_parameter)
-			{
-				std::array<double, 6 * 6> covpose;
+					for (auto pose_param : pose_parameter) {
+						std::array<double, 6 * 6> covpose;
 				
-				double cov_pose[36];
-				covariance.GetCovarianceBlock(pose_param, pose_param, cov_pose);
-				std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
-
-
-				for (int i = 0 ; i < 36 ; i++)
-				{
-					std::cout << cov_pose[i] << "\t" << std::endl;
+						double cov_pose[36];
+						covariance.GetCovarianceBlock(pose_param, pose_param, cov_pose);
+						std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
+						outputFile << cov_pose[21]*13 << "\t" << cov_pose[28]*13 << "\t" << cov_pose[35]*13 << "\t" << std::endl;
+						covariance_pose.push_back(covpose);
+					}
 				}
-				covariance_pose.push_back(covpose);
 			}
-			}
-			}
-			catch(const std::exception& e)
-			{
+			
+			catch(const std::exception& e) {
 				std::cout << "Unable to compute covariance" << std::endl;
 			}
-			*/
 			
+			
+
+			outputFile.close();
 			
 			if (ceres_options_.bCeres_summary_)
 				std::cout << summary.FullReport() << std::endl;
