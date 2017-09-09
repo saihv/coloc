@@ -267,7 +267,8 @@ int main(int argc, char **argv)
   const unsigned int nb_max_thread = (iNumThreads == 0) ? 0 : omp_get_max_threads();
     omp_set_num_threads(nb_max_thread);
     #pragma omp parallel for schedule(dynamic)
-#endif
+#endifge
+
   for (int i = 0; i < static_cast<int>(vec_image_new.size()); ++i)
   {
     std::vector<std::string>::const_iterator iter_image = vec_image_new.begin();

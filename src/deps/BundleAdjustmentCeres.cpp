@@ -440,7 +440,7 @@
 			ceres::Solve(ceres_config_options, &problem, &summary);
 
 			std::ofstream outputFile;
-			outputFile.open("/home/sai/program3data.txt", std::ofstream::out | std::ofstream::app);
+			outputFile.open("/home/sai/rsrch/loc/coloc/output/covariance.txt", std::ofstream::out | std::ofstream::app);
 			
 			try {
 				if (covariance.Compute(covariance_blocks, &problem)) {
@@ -452,7 +452,9 @@
 						double cov_pose[36];
 						covariance.GetCovarianceBlock(pose_param, pose_param, cov_pose);
 						std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
-						outputFile << cov_pose[21]*13 << "\t" << cov_pose[28]*13 << "\t" << cov_pose[35]*13 << "\t" << std::endl;
+						for (int i = 0 ; i < 36; ++i)
+							outputFile << cov_pose[i] << "\t";
+						outputFile << std::endl;
 						covariance_pose.push_back(covpose);
 					}
 				}

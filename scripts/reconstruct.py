@@ -14,7 +14,7 @@ if len(sys.argv) < 3:
     print ("Usage %s image_dir output_dir" % sys.argv[0])
     sys.exit(1)
 '''
-input_dir = "/home/sai/Dropbox/Lairsim/mix"
+input_dir = "/home/sai/Dropbox/AirSimData/Sep8/newmap"
 output_dir = input_dir
 matches_dir = os.path.join(output_dir, "matches")
 reconstruction_dir = os.path.join(output_dir, "reconstruction_sequential")
@@ -33,21 +33,21 @@ pIntrisics = subprocess.Popen( [os.path.join(binaryDir, "lister"),  "-i", input_
 pIntrisics.wait()
 
 print ("2. Compute features")
-pFeatures = subprocess.Popen( [os.path.join(binaryDir, "detector"),  "-i", matches_dir+"/sfm_data.json", "-o", matches_dir, "-m", "SIFT", "-p", "ULTRA", "-f", "1"] )
+pFeatures = subprocess.Popen( [os.path.join(binaryDir, "detector"),  "-i", matches_dir+"/sfm_data.json", "-o", matches_dir, "-m", "SIFT", "-p", "HIGH", "-f", "1"] )
 pFeatures.wait()
 
 print ("3. Compute matches")
-pMatches = subprocess.Popen( [os.path.join(binaryDir, "matcher"),  "-i", matches_dir+"/sfm_data.json", "-o", matches_dir, "-f", "1", "-g", "h"] )
+pMatches = subprocess.Popen( [os.path.join(binaryDir, "matcher"),  "-i", matches_dir+"/sfm_data.json", "-o", matches_dir, "-f", "1"] )
 pMatches.wait()
 
-os.rename(matches_dir+"/matches.h.bin", matches_dir+"/matches.f.bin")
+#os.rename(matches_dir+"/matches.h.bin", matches_dir+"/matches.f.bin")
 
 # Create the reconstruction if not present
 if not os.path.exists(reconstruction_dir):
     os.mkdir(reconstruction_dir)
 
 print ("4. Do Sequential/Incremental reconstruction")
-pRecons = subprocess.Popen( [os.path.join(binaryDir, "reconstructor"),  "-i", matches_dir+"/sfm_data.json", "-m", matches_dir, "-o", reconstruction_dir] )
+pRecons = subprocess.Popen( [os.path.join(binaryDir, "reconstructor"),  "-i", matches_dir+"/sfm_data.json", "-m", matches_dir, "-o", reconstruction_dir, "-f", "NONE"] )
 pRecons.wait()
 '''
 print ("5. Colorize Structure")

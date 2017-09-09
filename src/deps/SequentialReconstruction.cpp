@@ -14,10 +14,10 @@
 #include "openMVG/multiview/triangulation_nview.hpp"
 #include "Localizer.hpp"
 #include "SequentialReconstruction.hpp"
-#include "openMVG/sfm/pipelines/sfm_robust_model_estimation.hpp"
+#include "RobustEstimation.hpp"
 #include "BundleAdjustmentCeres.hpp"
 #include "openMVG/sfm/sfm_data_filters.hpp"
-#include "openMVG/sfm/sfm_data_io.hpp"
+#include "ReconstructionIO.hpp"
 #include "openMVG/stl/stl.hpp"
 #include "openMVG/system/timer.hpp"
 
@@ -597,7 +597,7 @@ bool Reconstruction::MakeInitialPair3D(const Pair & current_pair)
         (
 			Intrinsic_Parameter_Type::NONE, // Keep intrinsic constant
 			Extrinsic_Parameter_Type::ADJUST_ALL, // Adjust camera motion
-			Structure_Parameter_Type::NONE) // Adjust structure
+			Structure_Parameter_Type::ADJUST_ALL) // Adjust structure
         )
       )
     {

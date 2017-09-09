@@ -268,6 +268,7 @@ int main(int argc, char **argv)
   sfm_data.s_root_path = sImageDir; // Setup main image root_path
   Views & views = sfm_data.views;
   Intrinsics & intrinsics = sfm_data.intrinsics;
+  Poses & poses = sfm_data.poses;
 
   C_Progress_display my_progress_bar( vec_image.size(),
       std::cout, "\n- Image listing -\n" );
@@ -438,6 +439,10 @@ int main(int argc, char **argv)
         intrinsics[v.id_intrinsic] = intrinsic;
       }
 
+      if(v.id_pose == 1)
+        poses[v.id_pose] = Pose3(Mat3::Identity(), Vec3(13,0,0));
+
+
       // Add the view to the sfm_container
       views[v.id_view] = std::make_shared<View>(v);
     }
@@ -461,7 +466,7 @@ int main(int argc, char **argv)
   if (!Save(
     sfm_data,
     stlplus::create_filespec( sOutputDir, "sfm_data.json" ).c_str(),
-    ESfM_Data(VIEWS|INTRINSICS)))
+    ESfM_Data(VIEWS|EXTRINSICS|INTRINSICS)))
   {
     return EXIT_FAILURE;
   }

@@ -216,15 +216,18 @@ int main(int argc, char **argv)
 
   // list images in query directory
   std::vector<std::string> vec_image;
-
+  std::cout << sQueryDir;
   if (stlplus::is_file(sQueryDir))
   {
+    std::cout << "MANAKEYYY" ;
     vec_image.push_back(stlplus::filename_part(sQueryDir)); // single file
     sQueryDir = stlplus::folder_part(sQueryDir);
   }
   else vec_image = stlplus::folder_files(sQueryDir); // multiple files
 
   std::sort(vec_image.begin(), vec_image.end());
+
+  std::cout << vec_image[0];
 
   // find difference between two list of images
   std::vector<std::string> vec_image_new;
@@ -260,10 +263,16 @@ int main(int argc, char **argv)
 
   int total_num_images = 0;
 
+
+    
+  std::cout << "RAKADIIII" << vec_image_new.size() << std::endl;
+
+#ifdef OPENMVG_USE_OPENMP
   const unsigned int nb_max_thread = (iNumThreads == 0) ? 0 : omp_get_max_threads();
     omp_set_num_threads(nb_max_thread);
     #pragma omp parallel for schedule(dynamic)
-
+    #endif
+    
   for (int i = 0; i < static_cast<int>(vec_image_new.size()); ++i)
   {
     std::vector<std::string>::const_iterator iter_image = vec_image_new.begin();

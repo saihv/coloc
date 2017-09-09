@@ -14,11 +14,11 @@ if len(sys.argv) < 3:
     print ("Usage %s image_dir output_dir" % sys.argv[0])
     sys.exit(1)
 '''
-input_dir = "/home/sai/Dropbox/Lairsim/AirSim"
+input_dir = "/home/sai/Dropbox/AirSimData/Sep8/newmap"
 output_dir = input_dir
 matches_dir = os.path.join(output_dir, "matches")
 reconstruction_dir = os.path.join(output_dir, "reconstruction_sequential")
-query_dir = "/home/sai/Dropbox/Lairsim/2square"
+query_dir = "/home/sai/output/"
 output_dir = os.path.join(query_dir, "output")
 omatches_dir = os.path.join(query_dir, "features")
 
