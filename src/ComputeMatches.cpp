@@ -206,70 +206,49 @@ int main(int argc, char **argv)
 
 		RelativePose_Info relativePose_info;
 		SfM_Data tiny_scene;
-		tiny_scene.views[0].reset(new View("", 0, 1, 0, imageL.Width(), imageL.Height()));
-		tiny_scene.views[1].reset(new View("", 1, 1, 1, imageR.Width(), imageR.Height()));
+		tiny_scene.views[0].reset(new View("", 0, 0, 0, imageL.Width(), imageL.Height()));
+		tiny_scene.views[1].reset(new View("", 1, 0, 1, imageR.Width(), imageR.Height()));
 		tiny_scene.intrinsics[0].reset(new Pinhole_Intrinsic(imageL.Width(), imageL.Height(), K(0, 0), K(0, 2), K(1, 2)));
+
+		if (!robustRelativePose(K, K, xL, xR, relativePose_info, size_imaL, size_imaL, 256))
+		{
+			std::cerr << " /!\\ Robust relative pose estimation failure."
+				<< std::endl;
+			return EXIT_FAILURE;
+		}
+
+		std::cout << "\nFound an Essential matrix:\n"
+			<< "\tprecision: " << relativePose_info.found_residual_precision << " pixels\n"
+			<< "\t#inliers: " << relativePose_info.vec_inliers.size() << "\n"
+			<< "\t#matches: " << putativeMatches.size()
+			<< std::endl;
+
 
 		const Pinhole_Intrinsic * cam_I = dynamic_cast<const Pinhole_Intrinsic*> (tiny_scene.intrinsics[0].get());
 		const Pinhole_Intrinsic * cam_J = dynamic_cast<const Pinhole_Intrinsic*> (tiny_scene.intrinsics[0].get());
 
-		if (robustRelativePose(K, K, xL, xR, relativePose_info, size_imaL, size_imaL, 256))
-		{
-			std::vector<float> vec_angles;
-			vec_angles.reserve(relativePose_info.vec_inliers.size());
-			const Pose3 pose_I = Pose3(Mat3::Identity(), Vec3::Zero());
-			const Pose3 pose_J = relativePose_info.relativePose;
-			const Mat34 PI = tiny_scene.intrinsics[tiny_scene.views[0]->id_intrinsic]->get_projective_equivalent(pose_I);
-			const Mat34 PJ = tiny_scene.intrinsics[tiny_scene.views[0]->id_intrinsic]->get_projective_equivalent(pose_J);
+		const Pose3 pose0 = tiny_scene.poses[tiny_scene.views[0]->id_pose] = Pose3(Mat3::Identity(), Vec3::Zero());
+		const Pose3 pose1 = tiny_scene.poses[tiny_scene.views[1]->id_pose] = relativePose_info.relativePose;
 
-			for (const uint32_t & inlier_idx : relativePose_info.vec_inliers)
-			{
-				Vec3 X;
-				TriangulateDLT(
-					PI, xI.col(inlier_idx).homogeneous(),
-					PJ, xJ.col(inlier_idx).homogeneous(), &X);
-
-				openMVG::tracks::STLMAPTracks::const_iterator iterT = map_tracksCommon.begin();
-				std::advance(iterT, inlier_idx);
-				tracks::submapTrack::const_iterator iter = iterT->second.begin();
-				const Vec2 featI = features_provider_->feats_per_view[I][iter->second].coords().cast<double>();
-				const Vec2 featJ = features_provider_->feats_per_view[J][(++iter)->second].coords().cast<double>();
-				vec_angles.push_back(AngleBetweenRay(pose_I, cam_I, pose_J, cam_J, featI, featJ));
-			}
-		}
-
-		const Pose3 pose_I = sfm_data_.poses[view_I->id_pose] = tiny_scene.poses[view_I->id_pose];
-		const Pose3 pose_J = sfm_data_.poses[view_J->id_pose] = tiny_scene.poses[view_J->id_pose];
-		map_ACThreshold_.insert({ I, relativePose_info.found_residual_precision });
-		map_ACThreshold_.insert({ J, relativePose_info.found_residual_precision });
-		set_remaining_view_id_.erase(view_I->id_view);
-		set_remaining_view_id_.erase(view_J->id_view);
-
-		// List inliers and save them
-		for (Landmarks::const_iterator iter = tiny_scene.GetLandmarks().begin();
-			iter != tiny_scene.GetLandmarks().end(); ++iter)
-		{
-			const IndexT trackId = iter->first;
-			const Landmark & landmark = iter->second;
-			const Observations & obs = landmark.obs;
-			Observations::const_iterator iterObs_xI = obs.find(view_I->id_view);
-			Observations::const_iterator iterObs_xJ = obs.find(view_J->id_view);
-
-			const Observation & ob_xI = iterObs_xI->second;
-			const Observation & ob_xJ = iterObs_xJ->second;
-
-			const double angle = AngleBetweenRay(
-				pose_I, cam_I, pose_J, cam_J, ob_xI.x, ob_xJ.x);
-			const Vec2 residual_I = cam_I->residual(pose_I, landmark.X, ob_xI.x);
-			const Vec2 residual_J = cam_J->residual(pose_J, landmark.X, ob_xJ.x);
-			if (angle > 2.0 &&
-				pose_I.depth(landmark.X) > 0 &&
-				pose_J.depth(landmark.X) > 0 &&
-				residual_I.norm() < relativePose_info.found_residual_precision &&
-				residual_J.norm() < relativePose_info.found_residual_precision)
-			{
-				sfm_data_.structure[trackId] = landmarks[trackId];
-			}
+		// Init structure by inlier triangulation
+		const Mat34 P1 = tiny_scene.intrinsics[tiny_scene.views[0]->id_intrinsic]->get_projective_equivalent(pose0);
+		const Mat34 P2 = tiny_scene.intrinsics[tiny_scene.views[1]->id_intrinsic]->get_projective_equivalent(pose1);
+		Landmarks & landmarks = tiny_scene.structure;
+		for (size_t i = 0; i < relativePose_info.vec_inliers.size(); ++i) {
+			const SIOPointFeature & LL = regionsL->Features()[putativeMatches[relativePose_info.vec_inliers[i]].i_];
+			const SIOPointFeature & RR = regionsM->Features()[putativeMatches[relativePose_info.vec_inliers[i]].j_];
+			// Point triangulation
+			Vec3 X;
+			TriangulateDLT(
+				P1, LL.coords().cast<double>().homogeneous(),
+				P2, RR.coords().cast<double>().homogeneous(), &X);
+			// Reject point that is behind the camera
+			if (pose0.depth(X) < 0 && pose1.depth(X) < 0)
+				continue;
+			// Add a new landmark (3D point with it's 2d observations)
+			landmarks[i].obs[tiny_scene.views[0]->id_view] = Observation(LL.coords().cast<double>(), putativeMatches[relativePose_info.vec_inliers[i]].i_);
+			landmarks[i].obs[tiny_scene.views[1]->id_view] = Observation(RR.coords().cast<double>(), putativeMatches[relativePose_info.vec_inliers[i]].j_);
+			landmarks[i].X = X;
 		}
 
 		tracks::TracksBuilder tracksBuilder;
@@ -289,46 +268,45 @@ int main(int argc, char **argv)
 		openMVG::tracks::TracksUtilsMap::GetTracksIdVector(map_tracksCommon, &set_tracksIds);
 
 		std::set<uint32_t> reconstructed_trackId;
-		std::transform(sfm_data_.GetLandmarks().begin(), sfm_data_.GetLandmarks().end(),
+		std::transform(tiny_scene.GetLandmarks().begin(), tiny_scene.GetLandmarks().end(),
 			std::inserter(reconstructed_trackId, reconstructed_trackId.begin()),
 			stl::RetrieveKey());
 
-		// Get the ids of the already reconstructed tracks
 		std::set<uint32_t> set_trackIdForResection;
 		std::set_intersection(set_tracksIds.cbegin(), set_tracksIds.cend(),
 			reconstructed_trackId.cbegin(), reconstructed_trackId.cend(),
 			std::inserter(set_trackIdForResection, set_trackIdForResection.begin()));
+
+		Hash_Map<IndexT, double> map_ACThreshold_;
 
 		if (set_trackIdForResection.empty())
 		{
 			// No match. The image has no connection with already reconstructed points.
 			std::cout << std::endl
 				<< "-------------------------------" << "\n"
-				<< "-- Resection of camera index: " << viewIndex << "\n"
+				<< "-- Resection of camera index: " << "\n"
 				<< "-- Resection status: " << "FAILED" << "\n"
 				<< "-------------------------------" << std::endl;
 			return false;
 		}
 
-		// Get back featId associated to a tracksID already reconstructed.
-		// These 2D/3D associations will be used for the resection.
 		std::vector<uint32_t> vec_featIdForResection;
-		TracksUtilsMap::GetFeatIndexPerViewAndTrackId(map_tracksCommon,
+		openMVG::tracks::TracksUtilsMap::GetFeatIndexPerViewAndTrackId(map_tracksCommon,
 			set_trackIdForResection,
-			viewIndex,
+			2,
 			&vec_featIdForResection);
 
-		// Localize the image inside the SfM reconstruction
 		Image_Localizer_Match_Data resection_data;
 		resection_data.pt2D.resize(2, set_trackIdForResection.size());
 		resection_data.pt3D.resize(3, set_trackIdForResection.size());
 
-		// B. Look if intrinsic data is known or not
-		const View * view_I = sfm_data_.GetViews().at(viewIndex).get();
+		tiny_scene.views[2].reset(new View("", 2, 0, 1, imageR.Width(), imageR.Height()));
+
+		const View * view_I = tiny_scene.GetViews().at(2).get();
 		std::shared_ptr<cameras::IntrinsicBase> optional_intrinsic(nullptr);
-		if (sfm_data_.GetIntrinsics().count(view_I->id_intrinsic))
+		if (tiny_scene.GetIntrinsics().count(view_I->id_intrinsic))
 		{
-			optional_intrinsic = sfm_data_.GetIntrinsics().at(view_I->id_intrinsic);
+			optional_intrinsic = tiny_scene.GetIntrinsics().at(view_I->id_intrinsic);
 		}
 
 		// Setup the track 2d observation for this new view
@@ -337,9 +315,9 @@ int main(int argc, char **argv)
 		std::vector<uint32_t>::const_iterator iterfeatId = vec_featIdForResection.begin();
 		for (size_t cpt = 0; cpt < vec_featIdForResection.size(); ++cpt, ++iterTrackId, ++iterfeatId)
 		{
-			resection_data.pt3D.col(cpt) = sfm_data_.GetLandmarks().at(*iterTrackId).X;
+			resection_data.pt3D.col(cpt) = tiny_scene.GetLandmarks().at(*iterTrackId).X;
 			resection_data.pt2D.col(cpt) = pt2D_original.col(cpt) =
-				features_provider_->feats_per_view.at(viewIndex)[*iterfeatId].coords().cast<double>();
+				featsR[*iterfeatId].coords().cast<double>();
 			// Handle image distortion if intrinsic is known (to ease the resection)
 			if (optional_intrinsic && optional_intrinsic->have_disto())
 			{
@@ -347,6 +325,162 @@ int main(int argc, char **argv)
 			}
 		}
 
+		// C. Do the resectioning: compute the camera pose
+		std::cout << std::endl
+			<< "-------------------------------" << std::endl
+			<< "-- Robust Resection of view: " << std::endl;
+
+		geometry::Pose3 pose;
+		const bool bResection = sfm::SfM_Localizer::Localize
+		(
+			optional_intrinsic ? resection::SolverType::P3P_KE_CVPR17 : resection::SolverType::DLT_6POINTS,
+			{ view_I->ui_width, view_I->ui_height },
+			optional_intrinsic.get(),
+			resection_data,
+			pose
+		);
+		resection_data.pt2D = std::move(pt2D_original); // restore original image domain points
+
+
+			std::cout << std::endl
+				<< "-------------------------------" << "<br>"
+				<< "-- Robust Resection of camera index: <" << "> image: "
+				<< view_I->s_Img_path << "<br>"
+				<< "-- Threshold: " << resection_data.error_max << "<br>"
+				<< "-- Resection status: " << (bResection ? "OK" : "FAILED") << "<br>"
+				<< "-- Nb points used for Resection: " << vec_featIdForResection.size() << "<br>"
+				<< "-- Nb points validated by robust estimation: " << resection_data.vec_inliers.size() << "<br>"
+				<< "-- % points validated: "
+				<< resection_data.vec_inliers.size() / static_cast<float>(vec_featIdForResection.size()) << "<br>"
+				<< "-------------------------------" << "<br>";
+
+
+			// E. Update the global scene with:
+			// - the new found camera pose
+			tiny_scene.poses[view_I->id_pose] = pose;
+			// - track the view's AContrario robust estimation found threshold
+			// map_ACThreshold_.insert({ viewIndex, resection_data.error_max });
+			// - intrinsic parameters (if the view has no intrinsic group add a new one)
+			
+
+			map_ACThreshold_.insert({ 2, resection_data.error_max });
+			{
+				const IndexT I = 2;
+				const View * view_I = tiny_scene.GetViews().at(I).get();
+				const IntrinsicBase * cam_I = tiny_scene.GetIntrinsics().at(view_I->id_intrinsic).get();
+				const Pose3 pose_I = tiny_scene.GetPoseOrDie(view_I);
+
+				// Vector of all already reconstructed views
+				const std::set<IndexT> valid_views = Get_Valid_Views(tiny_scene);
+
+				// Go through each track and look if we must add new view observations or new 3D points
+				for (const std::pair< uint32_t, tracks::submapTrack >& trackIt : map_tracksCommon)
+				{
+					const uint32_t trackId = trackIt.first;
+					const tracks::submapTrack & track = trackIt.second;
+
+					// List the potential view observations of the track
+					const tracks::submapTrack & allViews_of_track = map_tracks_[trackId];
+
+					// List to save the new view observations that must be added to the track
+					std::set<IndexT> new_track_observations_valid_views;
+
+					// If the track was already reconstructed
+					if (tiny_scene.structure.count(trackId) != 0)
+					{
+						// Since the 3D point was triangulated before we add the new the Inth view observation
+						new_track_observations_valid_views.insert(I);
+					}
+					else
+					{
+						// Go through the views that observe this track & look if a successful triangulation can be done
+						for (const std::pair< IndexT, IndexT >& trackViewIt : allViews_of_track)
+						{
+							const IndexT & J = trackViewIt.first;
+							// If view is valid try triangulation
+							if (J != I && valid_views.count(J) != 0)
+							{
+								// If successfuly triangulated add the observation from J view
+								if (tiny_scene.structure.count(trackId) != 0)
+								{
+									new_track_observations_valid_views.insert(J);
+								}
+								else
+								{
+									const View * view_J = tiny_scene.GetViews().at(J).get();
+									const IntrinsicBase * cam_J = tiny_scene.GetIntrinsics().at(view_J->id_intrinsic).get();
+									const Pose3 pose_J = tiny_scene.GetPoseOrDie(view_J);
+									const Vec2 xJ = featsR[allViews_of_track.at(J)].coords().cast<double>();
+
+									// Position of the point in view I
+									const Vec2 xI = featsL[track.at(I)].coords().cast<double>();
+
+									// Try to triangulate a 3D point from J view
+									// A new 3D point must be added
+									// Triangulate it
+									const Vec2 xI_ud = cam_I->get_ud_pixel(xI);
+									const Vec2 xJ_ud = cam_J->get_ud_pixel(xJ);
+									const Mat34 P_I = cam_I->get_projective_equivalent(pose_I);
+									const Mat34 P_J = cam_J->get_projective_equivalent(pose_J);
+									Vec3 X = Vec3::Zero();
+									TriangulateDLT(P_I, xI_ud.homogeneous(), P_J, xJ_ud.homogeneous(), &X);
+									// Check triangulation result
+									const double angle = AngleBetweenRay(pose_I, cam_I, pose_J, cam_J, xI, xJ);
+									const Vec2 residual_I = cam_I->residual(pose_I, X, xI);
+									const Vec2 residual_J = cam_J->residual(pose_J, X, xJ);
+									if (
+										//  - Check angle (small angle leads to imprecise triangulation)
+										angle > 2.0 &&
+										//  - Check positive depth
+										pose_I.depth(X) > 0 &&
+										pose_J.depth(X) > 0 &&
+										//  - Check residual values (must be inferior to the found view's AContrario threshold)
+										residual_I.norm() < std::max(4.0, map_ACThreshold_.at(I)) &&
+										residual_J.norm() < std::max(4.0, map_ACThreshold_.at(J))
+										)
+									{
+										// Add a new track
+										Landmark & landmark = tiny_scene.structure[trackId];
+										landmark.X = X;
+										new_track_observations_valid_views.insert(I);
+										new_track_observations_valid_views.insert(J);
+									} // 3D point is valid
+									else
+									{
+										// We mark the view to add the observations once the point is triangulated
+										new_track_observations_valid_views.insert(J);
+									} // 3D point is invalid
+								}
+							}
+						}// Go through all the views
+					}// If new point
+
+					 // If successfuly triangulated, add the valid view observations
+					if (tiny_scene.structure.count(trackId) != 0 &&
+						!new_track_observations_valid_views.empty()
+						)
+					{
+						Landmark & landmark = tiny_scene.structure[trackId];
+						// Check if view feature point observations of the track are valid (residual, depth) or not
+						for (const IndexT &J : new_track_observations_valid_views)
+						{
+							const View * view_J = tiny_scene.GetViews().at(J).get();
+							const IntrinsicBase * cam_J = tiny_scene.GetIntrinsics().at(view_J->id_intrinsic).get();
+							const Pose3 pose_J = tiny_scene.GetPoseOrDie(view_J);
+							const Vec2 xJ = featsR[allViews_of_track.at(J)].coords().cast<double>();
+
+							const Vec2 residual = cam_J->residual(pose_J, landmark.X, xJ);
+							if (pose_J.depth(landmark.X) > 0 &&
+								residual.norm() < std::max(4.0, map_ACThreshold_.at(J))
+								)
+							{
+								landmark.obs[J] = Observation(xJ, allViews_of_track.at(J));
+							}
+						}
+					}
+				}
+
+			}
 	}
 
 
