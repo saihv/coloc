@@ -16,7 +16,7 @@ else()
         message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
 
-set(OpenMVG_DIR "/home/sai/software/installMVG/share/openMVG/cmake")
+set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install/share/openMVG/cmake")
 
 find_package (OpenMVG REQUIRED)
 find_package( Threads REQUIRED)
@@ -32,50 +32,23 @@ include_directories(
     ${Eigen_INCLUDE_DIRS}
 )
 
-add_executable(lister src/ImageListing.cpp)
-target_link_libraries(lister
+file(
+  GLOB_RECURSE
+  coloc_headers
+  *.hpp
+)
+file(
+  GLOB_RECURSE
+  coloc_files
+  *.cpp
+)
+
+add_executable(coloc ${coloc_headers} coloc.cpp)
+target_link_libraries(coloc
   openMVG_system
   openMVG_image
   openMVG_features
+  openMVG_multiview
+  openMVG_matching_image_collection
   openMVG_sfm
   easyexif)
-
-add_executable(detector src/ComputeFeatures.cpp)
-target_link_libraries(detector
-  openMVG_system
-  openMVG_image
-  openMVG_features
-  openMVG_multiview
-  openMVG_sfm
-  stlplus
-  vlsift)
-
-add_executable(matcher src/ComputeMatches.cpp)
-target_link_libraries(matcher
-  openMVG_system
-  openMVG_features
-  openMVG_multiview
-  openMVG_sfm
-  openMVG_matching_image_collection
-  stlplus)
-
-add_executable(reconstructor src/Reconstruct.cpp)
-target_link_libraries(reconstructor
-  openMVG_system
-  openMVG_image
-  openMVG_features
-  openMVG_sfm
-  coloc_sfm
-  stlplus
-  ${CERES_INCLUDE_DIRS})
-
-add_executable(localizer src/Localize.cpp)
-target_link_libraries(localizer
-openMVG_system
-openMVG_image
-openMVG_features
-openMVG_matching_image_collection
-openMVG_sfm
-coloc_sfm
-easyexif
-vlsift)
