@@ -35,15 +35,15 @@ include_directories(
 file(
   GLOB_RECURSE
   coloc_headers
-  *.hpp
+  src/*.hpp
 )
 file(
   GLOB_RECURSE
   coloc_files
-  *.cpp
+  src/*.cpp
 )
 
-add_executable(coloc ${coloc_headers} coloc.cpp)
+add_executable(coloc ${coloc_headers} ${coloc_files})
 target_link_libraries(coloc
   openMVG_system
   openMVG_image
@@ -51,4 +51,6 @@ target_link_libraries(coloc
   openMVG_multiview
   openMVG_matching_image_collection
   openMVG_sfm
-  easyexif)
+  stlplus
+  easyexif
+  vlsift)

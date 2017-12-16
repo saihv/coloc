@@ -14,7 +14,8 @@ namespace coloc
 	class FeatureExtractor {
 	public:
 		FeatureExtractor(std::string& method);
-		void detectFeatures(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName);
+		void detectFeatures(unsigned int index, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName);
+		void saveFeatureData(std::string& imageName);
 		// int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 
 	private:
@@ -29,15 +30,19 @@ namespace coloc
 			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
 	}
 
-	void FeatureExtractor::detectFeatures(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName)
+	void FeatureExtractor::detectFeatures(unsigned int index, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName)
 	{
 		image::Image<unsigned char> imageGray;
 
 		if (!ReadImage(imageName.c_str(), &imageGray)) {
 			std::cout << "Unable to read image from the given path." << std::endl;
 		}
-		image_describer->Describe(imageGray, regions[0]);
+		image_describer->Describe(imageGray, regions[index]);
+	}
+
+	void FeatureExtractor::saveFeatureData(std::string& imageName)
+	{
+
 	}
 }
-
 

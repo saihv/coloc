@@ -1,14 +1,15 @@
 #pragma once
 
+#include "openMVG/features/akaze/image_describer_akaze.hpp"
+#include "openMVG/features/image_describer_akaze_io.hpp"
+#include "openMVG/image/image_io.hpp"
 #include "openMVG/features/descriptor.hpp"
 #include "openMVG/features/feature.hpp"
 #include "openMVG/matching/indMatch.hpp"
 #include "openMVG/matching/indMatch_utils.hpp"
 #include "openMVG/matching_image_collection/Matcher_Regions.hpp"
 #include "openMVG/matching_image_collection/Cascade_Hashing_Matcher_Regions.hpp"
-#include "openMVG/features/akaze/image_describer_akaze.hpp"
-#include "openMVG/features/image_describer_akaze_io.hpp"
-#include "third_party/stlplus3/filesystemSimplified/file_system.hpp"
+#include "openMVG/matching_image_collection/Pair_Builder.hpp"
 #include "openMVG/matching/regions_matcher.hpp"
 
 using namespace openMVG;
@@ -17,16 +18,16 @@ using namespace openMVG::sfm;
 
 namespace coloc
 {
-	class matcher {
+	class FeatureMatcher {
 	public:
-		matcher(std::string& featType, std::string& dirPath);
+		FeatureMatcher(std::string& featType);
 
-		Pair_Set handlePairs();
-		PairWiseMatches computePairMatches(std::string& imagePath1, std::string& imagePath2);
+		Pair_Set handlePairs(int);
+		void computePairMatches(const Pair& pairIdx, std::unique_ptr<features::Regions>& regions1, std::unique_ptr<features::Regions>& regions2, PairWiseMatches& putativeMatches);
+		void computeMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches);
 
 	private:
 		std::unique_ptr<openMVG::features::Regions> regions_type;
-		std::string baseDir;
 
 		std::string featFile, descFile;
 
@@ -34,17 +35,33 @@ namespace coloc
 		std::map<Pair, unsigned int> overlap;
 	};
 
-	matcher::matcher(std::string& featType, std::string& dirPath) {
-
-		baseDir = dirPath;
-
+	FeatureMatcher::FeatureMatcher(std::string& featType) 
+	{
 		if (featType == "AKAZE")
 			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
 		else if (featType == "SIFT")
 			regions_type.reset(new openMVG::features::SIFT_Regions);
 	}
 
-	PairWiseMatches matcher::computePairMatches(std::string& imagePath1, std::string& imagePath2) {
+	Pair_Set FeatureMatcher::handlePairs(int numImages)
+	{
+		return exhaustivePairs(numImages);
+	}
+
+	void FeatureMatcher::computeMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches)
+	{
+		int numImages = regions.size();
+		Pair_Set pairs = handlePairs(numImages);
+
+		for (const auto pairIdx : pairs)
+		{
+			computePairMatches(pairIdx, regions.at(pairIdx.first), regions.at(pairIdx.second), putativeMatches);
+		}
+	}
+
+	void FeatureMatcher::computePairMatches(const Pair& pairIdx, std::unique_ptr<features::Regions>& regions1, std::unique_ptr<features::Regions>& regions2, PairWiseMatches& putativeMatches)
+	{
+		/*
 		featFile = stlplus::create_filespec(baseDir.c_str(), imagePath1.c_str(), ".feat");
 		descFile = stlplus::create_filespec(baseDir.c_str(), imagePath1.c_str(), ".desc");
 
@@ -58,22 +75,20 @@ namespace coloc
 
 		if (!regions_ptr2->Load(featFile, descFile))
 			std::cerr << "Invalid regions files for the view: " << std::endl;
-
+		*/
 		std::vector<IndMatch> vec_PutativeMatches;
 
 		matching::DistanceRatioMatch(
 			0.8, matching::BRUTE_FORCE_HAMMING,
-			*regions_ptr1.get(),
-			*regions_ptr2.get(),
+			*regions1.get(),
+			*regions2.get(),
 			vec_PutativeMatches);
 
 		if (!vec_PutativeMatches.empty()) {
-			putativeMatches.insert({ { 0,1 }, std::move(vec_PutativeMatches) });
-			overlap.insert({ { 0, 1 }, std::move(vec_PutativeMatches.size()) });
+			putativeMatches.insert({ pairIdx, std::move(vec_PutativeMatches) });
+			overlap.insert({ pairIdx, std::move(vec_PutativeMatches.size()) });
 		}
 		else
-			overlap.insert({ { 0, 1 }, 0 });
-
-		return putativeMatches;
+			overlap.insert({ pairIdx, 0 });
 	}
 }
