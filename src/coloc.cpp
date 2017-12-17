@@ -3,6 +3,7 @@
 #include "featureDetector.hpp"
 #include "featureMatcher.hpp"
 #include "robustMatcher.hpp"
+#include "mapBuilder.hpp"
 
 int main()
 {
@@ -11,6 +12,8 @@ int main()
 	coloc::FeatureExtractor detector(detectorType);
 	coloc::FeatureMatcher matcher(detectorType);
 	coloc::RobustMatcher robustMatcher(640, 480);
+	coloc::Reconstructor reconstructor(640, 480);
+
 	unsigned int numDrones = 2;
 
 	std::string filename[2];
@@ -22,6 +25,7 @@ int main()
 
 	matcher.computeMatches(data.regions, data.putativeMatches);
 	robustMatcher.filterMatches(data.regions, data.putativeMatches, data.geometricMatches);
+	reconstructor.reconstructScene(data);
 
 	return 0;
 }

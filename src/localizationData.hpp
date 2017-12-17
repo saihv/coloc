@@ -63,5 +63,6 @@ namespace coloc
 		PairWiseMatches putativeMatches, geometricMatches;
 		std::map<Pair, RelativePose_Info> relativePoses;
 		std::map<Pair, double> overlap;
+		SfM_Data scene;
 	};
 }
