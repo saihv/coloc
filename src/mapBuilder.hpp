@@ -89,8 +89,7 @@ namespace coloc
 
 		initializeTracks(seedPair);
 		initializeScene(640, 480);
-		triangulatePoints();
-	
+		triangulatePoints();	
 	}
 	
 	void Reconstructor::initializeTracks(Pair& viewPair)
@@ -168,7 +167,6 @@ namespace coloc
 		P2 = cam_J->get_projective_equivalent(Pose_J);
 	}
 	
-	/*
 	bool Reconstructor::resectionCamera(unsigned int id)
 	{
 		openMVG::tracks::STLMAPTracks map_tracksCommonNew;
@@ -177,13 +175,13 @@ namespace coloc
 		openMVG::tracks::TracksUtilsMap::GetTracksIdVector(map_tracksCommonNew, &set_tracksIds);
 
 		std::set<uint32_t> reconstructed_trackId;
-		std::transform(scene.GetLandmarks().begin(), scene.GetLandmarks().end(), std::inserter(reconstructed_trackId, reconstructed_trackId.begin()), stl::RetrieveKey());
+		std::transform(scene->GetLandmarks().begin(), scene->GetLandmarks().end(), std::inserter(reconstructed_trackId, reconstructed_trackId.begin()), stl::RetrieveKey());
 
 		std::set<uint32_t> set_trackIdForResection;
 		std::set_intersection(set_tracksIds.cbegin(), set_tracksIds.cend(), reconstructed_trackId.cbegin(), reconstructed_trackId.cend(), std::inserter(set_trackIdForResection, set_trackIdForResection.begin()));
 
 
-
+		const PointFeatures resectionFeats = regionsRCT->at(id)->GetRegionsPositions();
 
 		if (set_trackIdForResection.empty())
 		{
@@ -206,12 +204,12 @@ namespace coloc
 		resection_data.pt2D.resize(2, set_trackIdForResection.size());
 		resection_data.pt3D.resize(3, set_trackIdForResection.size());
 
-		scene.views[id].reset(new View("", 2, 0, 2, imageR.Width(), imageR.Height()));
+		scene->views[id].reset(new View("", 2, 0, 2, imageSize.first, imageSize.second));
 
-		const View * view_I = scene.GetViews().at(id).get();
+		const View * view_I = scene->GetViews().at(id).get();
 		std::shared_ptr<cameras::IntrinsicBase> optional_intrinsic(nullptr);
-		if (scene.GetIntrinsics().count(view_I->id_intrinsic))
-			optional_intrinsic = scene.GetIntrinsics().at(view_I->id_intrinsic);
+		if (scene->GetIntrinsics().count(view_I->id_intrinsic))
+			optional_intrinsic = scene->GetIntrinsics().at(view_I->id_intrinsic);
 
 		// Setup the track 2d observation for this new view
 		Mat2X pt2D_original(2, set_trackIdForResection.size());
@@ -219,8 +217,8 @@ namespace coloc
 		std::vector<uint32_t>::const_iterator iterfeatId = vec_featIdForResection.begin();
 		for (size_t cpt = 0; cpt < vec_featIdForResection.size(); ++cpt, ++iterTrackId, ++iterfeatId)
 		{
-			resection_data.pt3D.col(cpt) = scene.GetLandmarks().at(*iterTrackId).X;
-			resection_data.pt2D.col(cpt) = pt2D_original.col(cpt) = featsR[*iterfeatId].coords().cast<double>();
+			resection_data.pt3D.col(cpt) = scene->GetLandmarks().at(*iterTrackId).X;
+			resection_data.pt2D.col(cpt) = pt2D_original.col(cpt) = resectionFeats[*iterfeatId].coords().cast<double>();
 			// Handle image distortion if intrinsic is known (to ease the resection)
 			if (optional_intrinsic && optional_intrinsic->have_disto())
 			{
@@ -258,23 +256,23 @@ namespace coloc
 			<< "-------------------------------" << "<br>";
 
 
-		scene.poses[view_I->id_pose] = pose;
+		scene->poses[view_I->id_pose] = pose;
 
 
 		// Since the view have not yet an intrinsic group before, create a new one
 		IndexT new_intrinsic_id = 0;
-		if (!scene.GetIntrinsics().empty())
+		if (!scene->GetIntrinsics().empty())
 		{
 			// Since some intrinsic Id already exists,
 			//  we have to create a new unique identifier following the existing one
 			std::set<IndexT> existing_intrinsicId;
-			std::transform(scene.GetIntrinsics().begin(), scene.GetIntrinsics().end(),
+			std::transform(scene->GetIntrinsics().begin(), scene->GetIntrinsics().end(),
 				std::inserter(existing_intrinsicId, existing_intrinsicId.begin()),
 				stl::RetrieveKey());
 			new_intrinsic_id = (*existing_intrinsicId.rbegin()) + 1;
 		}
-		scene.views.at(id)->id_intrinsic = new_intrinsic_id;
-		scene.intrinsics[new_intrinsic_id] = optional_intrinsic;
+		scene->views.at(id)->id_intrinsic = new_intrinsic_id;
+		scene->intrinsics[new_intrinsic_id] = optional_intrinsic;
 
 
 
@@ -284,12 +282,12 @@ namespace coloc
 		{
 			// Get information of new view
 			const IndexT I = 2;
-			const View * view_I = scene.GetViews().at(I).get();
-			const IntrinsicBase * cam_I = scene.GetIntrinsics().at(view_I->id_intrinsic).get();
-			const Pose3 pose_I = scene.GetPoseOrDie(view_I);
+			const View * view_I = scene->GetViews().at(I).get();
+			const cameras::IntrinsicBase * cam_I = scene->GetIntrinsics().at(view_I->id_intrinsic).get();
+			const Pose3 pose_I = scene->GetPoseOrDie(view_I);
 
 			// Vector of all already reconstructed views
-			const std::set<IndexT> valid_views = Get_Valid_Views(scene);
+			const std::set<IndexT> valid_views = Get_Valid_Views(*scene);
 
 			// Go through each track and look if we must add new view observations or new 3D points
 			for (const std::pair< uint32_t, tracks::submapTrack >& trackIt : map_tracksCommonNew)
@@ -298,13 +296,13 @@ namespace coloc
 				const tracks::submapTrack & track = trackIt.second;
 
 				// List the potential view observations of the track
-				const tracks::submapTrack & allViews_of_track = map_tracks_[trackId];
+				const tracks::submapTrack & allViews_of_track = mapTracks[trackId];
 
 				// List to save the new view observations that must be added to the track
 				std::set<IndexT> new_track_observations_valid_views;
 
 				// If the track was already reconstructed
-				if (scene.structure.count(trackId) != 0)
+				if (scene->structure.count(trackId) != 0)
 				{
 					// Since the 3D point was triangulated before we add the new the Inth view observation
 					new_track_observations_valid_views.insert(I);
@@ -319,19 +317,19 @@ namespace coloc
 						if (J != I && valid_views.count(J) != 0)
 						{
 							// If successfuly triangulated add the observation from J view
-							if (scene.structure.count(trackId) != 0)
+							if (scene->structure.count(trackId) != 0)
 							{
 								new_track_observations_valid_views.insert(J);
 							}
 							else
 							{
-								const View * view_J = scene.GetViews().at(J).get();
-								const IntrinsicBase * cam_J = scene.GetIntrinsics().at(view_J->id_intrinsic).get();
-								const Pose3 pose_J = scene.GetPoseOrDie(view_J);
-								const Vec2 xJ = feats[J][allViews_of_track.at(J)].coords().cast<double>();
+								const View * view_J = scene->GetViews().at(J).get();
+								const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
+								const Pose3 pose_J = scene->GetPoseOrDie(view_J);
+								const Vec2 xJ = resectionFeats[allViews_of_track.at(J)].coords().cast<double>();
 
 								// Position of the point in view I
-								const Vec2 xI = feats[I][track.at(I)].coords().cast<double>();
+								const Vec2 xI = regionsRCT->at(I)->GetRegionsPositions()[track.at(I)].coords().cast<double>();
 
 								// Try to triangulate a 3D point from J view
 								// A new 3D point must be added
@@ -344,8 +342,8 @@ namespace coloc
 								TriangulateDLT(P_I, xI_ud.homogeneous(), P_J, xJ_ud.homogeneous(), &X);
 								// Check triangulation result
 								const double angle = AngleBetweenRay(pose_I, cam_I, pose_J, cam_J, xI, xJ);
-								const Vec2 residual_I = cam_I->residual(pose_I, X, xI);
-								const Vec2 residual_J = cam_J->residual(pose_J, X, xJ);
+								const Vec2 residual_I = cam_I->residual(pose_I(X), xI);
+								const Vec2 residual_J = cam_J->residual(pose_J(X), xJ);
 								if (
 									//  - Check angle (small angle leads to imprecise triangulation)
 									angle > 2.0 &&
@@ -355,7 +353,7 @@ namespace coloc
 									)
 								{
 									// Add a new track
-									Landmark & landmark = scene.structure[trackId];
+									Landmark & landmark = scene->structure[trackId];
 									landmark.X = X;
 									new_track_observations_valid_views.insert(I);
 									new_track_observations_valid_views.insert(J);
@@ -371,18 +369,18 @@ namespace coloc
 				}// If new point
 
 				 // If successfuly triangulated, add the valid view observations
-				if (scene.structure.count(trackId) != 0 && !new_track_observations_valid_views.empty())
+				if (scene->structure.count(trackId) != 0 && !new_track_observations_valid_views.empty())
 				{
-					Landmark & landmark = scene.structure[trackId];
+					Landmark & landmark = scene->structure[trackId];
 					// Check if view feature point observations of the track are valid (residual, depth) or not
 					for (const IndexT &J : new_track_observations_valid_views)
 					{
-						const View * view_J = scene.GetViews().at(J).get();
-						const IntrinsicBase * cam_J = scene.GetIntrinsics().at(view_J->id_intrinsic).get();
-						const Pose3 pose_J = scene.GetPoseOrDie(view_J);
-						const Vec2 xJ = feats[J][allViews_of_track.at(J)].coords().cast<double>();
+						const View * view_J = scene->GetViews().at(J).get();
+						const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
+						const Pose3 pose_J = scene->GetPoseOrDie(view_J);
+						const Vec2 xJ = resectionFeats[allViews_of_track.at(J)].coords().cast<double>();
 
-						const Vec2 residual = cam_J->residual(pose_J, landmark.X, xJ);
+						const Vec2 residual = cam_J->residual(pose_J(landmark.X), xJ);
 						if (pose_J.depth(landmark.X) > 0)
 						{
 							landmark.obs[J] = Observation(xJ, allViews_of_track.at(J));
@@ -392,5 +390,4 @@ namespace coloc
 			}// All the tracks in the view
 		}
 	}
-	*/
 }
