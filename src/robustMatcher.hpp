@@ -31,7 +31,7 @@ namespace coloc
 		RobustMatcher(int, int);
 
 		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair, std::map<IndexT, std::unique_ptr<features::Regions> >&, PairWiseMatches&);
-		void filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches);
+		void filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, std::map<Pair, RelativePose_Info>& relativePoses);
 
 		PairWiseMatches geometricMatches;
 
@@ -73,7 +73,11 @@ namespace coloc
 
 		RelativePose_Info relativePose;
 
-		if (!robustRelativePose(K, K, xL, xR, relativePose, imageSize, imageSize, iterationCount))
+		const openMVG::cameras::Pinhole_Intrinsic
+			camL(imageSize.first, imageSize.second, K(0, 0), K(0, 2), K(1, 2)),
+			camR(imageSize.first, imageSize.second, K(0, 0), K(0, 2), K(1, 2));
+
+		if (!robustRelativePose(&camL, &camR, xL, xR, relativePose, imageSize, imageSize, iterationCount))
 		{
 			std::cerr << " /!\\ Robust relative pose estimation failure."
 				<< std::endl;
@@ -91,7 +95,7 @@ namespace coloc
 		return std::make_unique<RelativePose_Info>(relativePose);
 	}
 
-	void RobustMatcher::filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches)
+	void RobustMatcher::filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, std::map<Pair, RelativePose_Info>& relativePoses)
 	{
 		for (const auto matchedPair : putativeMatches) {
 			Pair currentPair = matchedPair.first;
@@ -105,7 +109,7 @@ namespace coloc
 			if (!vec_geometricMatches.empty())
 				geometricMatches.insert({ { currentPair.first, currentPair.second }, std::move(vec_geometricMatches) });
 
-			//relativePoses.insert({ { pair_idx.first, pair_idx.second }, relativePose_info });
+			relativePoses.insert({ currentPair, *relativePose });
 		}
 	}
 }

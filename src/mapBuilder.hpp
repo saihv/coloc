@@ -32,7 +32,7 @@ namespace coloc
 	class Reconstructor {
 	public:
 		
-		Reconstructor(int w, int h) : regionsRCT(nullptr), matchesRCT(nullptr), relativePosesRCT(nullptr), scene(nullptr)
+		Reconstructor(int w, int h) 
 		{
 			imageSize.first = w;
 			imageSize.second = w;
@@ -41,7 +41,7 @@ namespace coloc
 				0, 0, 1;
 		}
 
-		void reconstructScene(LocalizationData& data);
+		void reconstructScene(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, LocalizationData& data);
 
 	private:
 		// Internal methods
@@ -51,11 +51,12 @@ namespace coloc
 		void triangulatePoints();
 		void constructProjectionsTriangulation(Mat34& P1, Mat34& P2);
 		bool resectionCamera(unsigned int);
+		bool saveSceneData(SfM_Data* scene);
 
 		// Internal variables
 
 		tracks::TracksBuilder tracksBuilder;
-		openMVG::tracks::STLMAPTracks mapTracks;
+		openMVG::tracks::STLMAPTracks mapTracks, mapTracksCommon;
 		std::unique_ptr<openMVG::tracks::SharedTrackVisibilityHelper> trackVisibility;
 		cameras::Pinhole_Intrinsic *cam_I, *cam_J;
 		std::pair <size_t, size_t> imageSize;
@@ -63,18 +64,18 @@ namespace coloc
 
 		// Local pointers to external localization data
 
-		std::unique_ptr <std::map<IndexT, std::unique_ptr<features::Regions> > > regionsRCT;
-		std::unique_ptr <PairWiseMatches> matchesRCT;
-		std::unique_ptr <std::map<Pair, RelativePose_Info > > relativePosesRCT;
-		std::unique_ptr <SfM_Data> scene;
+		std::map<IndexT, std::unique_ptr<features::Regions> > * regionsRCT;
+		PairWiseMatches* matchesRCT;
+		std::map<Pair, RelativePose_Info > * relativePosesRCT;
+		SfM_Data* scene;
 	};
 	
-	void Reconstructor::reconstructScene(LocalizationData& data)
+	void Reconstructor::reconstructScene(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, LocalizationData& data)
 	{
-		this->regionsRCT = std::make_unique <std::map <IndexT, std::unique_ptr<features::Regions> > >(data.regions);
-		this->matchesRCT = std::make_unique <PairWiseMatches> (data.geometricMatches);
-		this->relativePosesRCT = std::make_unique <std::map <Pair, RelativePose_Info> > (data.relativePoses);
-		this->scene = std::make_unique <SfM_Data> (data.scene);
+		this->regionsRCT = &regions;
+		this->matchesRCT = &data.geometricMatches;
+		this->relativePosesRCT = &data.relativePoses;
+		this->scene = &data.scene;
 
 		int maxMatches = 0;
 		Pair seedPair;
@@ -90,6 +91,8 @@ namespace coloc
 		initializeTracks(seedPair);
 		initializeScene(640, 480);
 		triangulatePoints();	
+		saveSceneData(this->scene);
+		resectionCamera(2);
 	}
 	
 	void Reconstructor::initializeTracks(Pair& viewPair)
@@ -98,9 +101,7 @@ namespace coloc
 		this->tracksBuilder.Filter();
 		this->tracksBuilder.ExportToSTL(mapTracks);
 		this->trackVisibility.reset(new openMVG::tracks::SharedTrackVisibilityHelper(mapTracks));
-
-		openMVG::tracks::STLMAPTracks map_tracksCommon;
-		this->trackVisibility->GetTracksInImages({ viewPair.first, viewPair.second }, map_tracksCommon);
+		this->trackVisibility->GetTracksInImages({ viewPair.first, viewPair.second }, mapTracksCommon);
 	}
 
 	void Reconstructor::initializeScene(int w, int h)
@@ -116,11 +117,11 @@ namespace coloc
 	
 	void Reconstructor::triangulatePoints()
 	{
-		const size_t n = mapTracks.size();
+		const size_t n = mapTracksCommon.size();
 		Mat xI(2, n), xJ(2, n);
 		uint32_t cptIndex = 0;
 		Vec2 feat;
-		for (openMVG::tracks::STLMAPTracks::const_iterator iterT = mapTracks.begin(); iterT != mapTracks.end(); ++iterT, ++cptIndex) {
+		for (openMVG::tracks::STLMAPTracks::const_iterator iterT = mapTracksCommon.begin(); iterT != mapTracksCommon.end(); ++iterT, ++cptIndex) {
 			tracks::submapTrack::const_iterator iter = iterT->second.begin();
 			const uint32_t i = iter->second;
 			const uint32_t j = (++iter)->second;
@@ -134,8 +135,8 @@ namespace coloc
 		Landmarks & landmarks = scene->structure;
 
 		for (openMVG::tracks::STLMAPTracks::const_iterator
-			iterT = mapTracks.begin();
-			iterT != mapTracks.end();
+			iterT = mapTracksCommon.begin();
+			iterT != mapTracksCommon.end();
 			++iterT)
 		{
 			// Get corresponding points
@@ -281,7 +282,7 @@ namespace coloc
 		//    - If the track does not exists, try robust triangulation & add the new valid view track observation
 		{
 			// Get information of new view
-			const IndexT I = 2;
+			const IndexT I = id;
 			const View * view_I = scene->GetViews().at(I).get();
 			const cameras::IntrinsicBase * cam_I = scene->GetIntrinsics().at(view_I->id_intrinsic).get();
 			const Pose3 pose_I = scene->GetPoseOrDie(view_I);
@@ -292,15 +293,14 @@ namespace coloc
 			// Go through each track and look if we must add new view observations or new 3D points
 			for (const std::pair< uint32_t, tracks::submapTrack >& trackIt : map_tracksCommonNew)
 			{
+				std::cout << trackIt.first << std::endl;
 				const uint32_t trackId = trackIt.first;
 				const tracks::submapTrack & track = trackIt.second;
-
 				// List the potential view observations of the track
 				const tracks::submapTrack & allViews_of_track = mapTracks[trackId];
 
 				// List to save the new view observations that must be added to the track
 				std::set<IndexT> new_track_observations_valid_views;
-
 				// If the track was already reconstructed
 				if (scene->structure.count(trackId) != 0)
 				{
@@ -326,7 +326,7 @@ namespace coloc
 								const View * view_J = scene->GetViews().at(J).get();
 								const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
 								const Pose3 pose_J = scene->GetPoseOrDie(view_J);
-								const Vec2 xJ = resectionFeats[allViews_of_track.at(J)].coords().cast<double>();
+								const Vec2 xJ = regionsRCT->at(J)->GetRegionsPositions()[allViews_of_track.at(J)].coords().cast<double>();
 
 								// Position of the point in view I
 								const Vec2 xI = regionsRCT->at(I)->GetRegionsPositions()[track.at(I)].coords().cast<double>();
@@ -378,7 +378,7 @@ namespace coloc
 						const View * view_J = scene->GetViews().at(J).get();
 						const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
 						const Pose3 pose_J = scene->GetPoseOrDie(view_J);
-						const Vec2 xJ = resectionFeats[allViews_of_track.at(J)].coords().cast<double>();
+						const Vec2 xJ = regionsRCT->at(J)->GetRegionsPositions()[allViews_of_track.at(J)].coords().cast<double>();
 
 						const Vec2 residual = cam_J->residual(pose_J(landmark.X), xJ);
 						if (pose_J.depth(landmark.X) > 0)
@@ -389,5 +389,13 @@ namespace coloc
 				}
 			}// All the tracks in the view
 		}
+	}
+
+	bool Reconstructor::saveSceneData(SfM_Data* scene)
+	{
+		if (openMVG::sfm::Save(*scene, stlplus::create_filespec("C:\\Users\\saihv\\Desktop", "initialPair.ply"), ESfM_Data(ALL)))
+			return 1;
+		else
+			return 0;
 	}
 }
