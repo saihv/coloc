@@ -20,7 +20,7 @@ namespace coloc
 {
 	class FeatureMatcher {
 	public:
-		FeatureMatcher(std::string& featType);
+		FeatureMatcher(LocalizationParams& params);
 
 		Pair_Set handlePairs(int);
 		void computePairMatches(const Pair& pairIdx, std::unique_ptr<features::Regions>& regions1, std::unique_ptr<features::Regions>& regions2, PairWiseMatches& putativeMatches);
@@ -28,18 +28,16 @@ namespace coloc
 
 	private:
 		std::unique_ptr<openMVG::features::Regions> regions_type;
-
 		std::string featFile, descFile;
-
 		PairWiseMatches putativeMatches;
 		std::map<Pair, unsigned int> overlap;
 	};
 
-	FeatureMatcher::FeatureMatcher(std::string& featType) 
+	FeatureMatcher::FeatureMatcher(LocalizationParams& params) 
 	{
-		if (featType == "AKAZE")
+		if (params.featureDetectorType == "AKAZE")
 			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
-		else if (featType == "SIFT")
+		else if (params.featureDetectorType == "SIFT")
 			regions_type.reset(new openMVG::features::SIFT_Regions);
 	}
 

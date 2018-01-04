@@ -13,7 +13,7 @@ namespace coloc
 {
 	class FeatureExtractor {
 	public:
-		FeatureExtractor(std::string& method);
+		FeatureExtractor(LocalizationParams& params);
 		void detectFeatures(unsigned int index, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName);
 		void saveFeatureData(uint16_t id, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& name);
 		// int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
@@ -22,11 +22,11 @@ namespace coloc
 		std::unique_ptr<features::Image_describer> image_describer;
 	};
 
-	FeatureExtractor::FeatureExtractor(std::string& method)
+	FeatureExtractor::FeatureExtractor(LocalizationParams& params)
 	{
-		if (method == "SIFT")
+		if (params.featureDetectorType == "SIFT")
 			image_describer.reset(new features::SIFT_Image_describer(features::SIFT_Image_describer::Params(), true));
-		else if (method == "AKAZE")
+		else if (params.featureDetectorType == "AKAZE")
 			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
 	}
 

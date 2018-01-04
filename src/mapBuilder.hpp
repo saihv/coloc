@@ -31,10 +31,10 @@ namespace coloc
 {
 	class Reconstructor {
 	public:
-		Reconstructor(std::pair <size_t, size_t> & size, Mat3& intrinsicMatrix)
+		Reconstructor(LocalizationParams& params)
 		{
-			this->imageSize = &size;
-			this->K = &intrinsicMatrix;
+			this->imageSize = &params.imageSize;
+			this->K = &params.K;
 		}
 
 		void reconstructScene(LocalizationData& data);

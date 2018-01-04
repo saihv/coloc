@@ -1,30 +1,35 @@
 #include "stdafx.h"
 #include "localizationData.hpp"
+#include "localizationParams.hpp"
 #include "featureDetector.hpp"
 #include "featureMatcher.hpp"
 #include "robustMatcher.hpp"
 #include "mapBuilder.hpp"
 #include "localizeImage.hpp"
 
+#include <filesystem>
+namespace fs = std::experimental::filesystem;
+
 int main()
 {
 	coloc::LocalizationData data;
+	coloc::LocalizationParams params;
 
-	std::string detectorType = "AKAZE";
-	std::pair <size_t, size_t> imageSize = std::make_pair(640, 480);
-	Mat3 K;
-	K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
+	params.featureDetectorType = "AKAZE";
+	params.imageSize = std::make_pair(640, 480);
+	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
+	params.imageFolder = "C:/Users/saihv/Desktop/test/";
 
-	coloc::FeatureExtractor detector(detectorType);
-	coloc::FeatureMatcher matcher(detectorType);
-	coloc::RobustMatcher robustMatcher(imageSize, K);
-	coloc::Reconstructor reconstructor(imageSize, K);
-	coloc::Localizer localizer(detectorType, imageSize, K);
+	coloc::FeatureExtractor detector(params);
+	coloc::FeatureMatcher matcher(params);
+	coloc::RobustMatcher robustMatcher(params);
+	coloc::Reconstructor reconstructor(params);
+	coloc::Localizer localizer(params);
 
 	unsigned int numDrones = 3;
 
-	std::string filename[3];
-	std::string rootFolder = "C:/Users/saihv/Desktop/test/";
+	std::string filename[3];	
+
 	filename[0] = "C:/Users/saihv/Desktop/test/img__Quad0_0.png";
 	filename[1] = "C:/Users/saihv/Desktop/test/img__Quad1_0.png";
 	filename[2] = "C:/Users/saihv/Desktop/test/img__Quad2_0.png";
@@ -33,15 +38,18 @@ int main()
 		detector.detectFeatures(i, data.regions, filename[i]);
 		detector.saveFeatureData(i, data.regions, filename[i]);
 
-		data.scene.views[i].reset(new View(filename[i], i, 0, i, imageSize.first, imageSize.second));
+		data.scene.views[i].reset(new View(filename[i], i, 0, i, params.imageSize.first, params.imageSize.second));
 	}
 
 	matcher.computeMatches(data.regions, data.putativeMatches);
 	robustMatcher.filterMatches(data.regions, data.putativeMatches, data.geometricMatches, data.relativePoses);
 	reconstructor.reconstructScene(data);
 
-	data.scene.s_root_path = rootFolder;
+	data.scene.s_root_path = params.imageFolder;
 	localizer.setupMap(data);
+
+	Pose3 pose;
+	localizer.localizeImage(filename[1], pose);
 
 	return 0;
 }

@@ -28,12 +28,11 @@ namespace coloc
 {
 	class RobustMatcher {
 	public:
-		RobustMatcher(std::pair <size_t, size_t> & size, Mat3& intrinsicMatrix)
+		RobustMatcher(LocalizationParams& params)
 		{
-			this->imageSize = &size;
-			this->K = &intrinsicMatrix;
+			this->imageSize = &params.imageSize;
+			this->K = &params.K;
 		}
-
 
 		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair, std::map<IndexT, std::unique_ptr<features::Regions> >&, PairWiseMatches&);
 		void filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, std::map<Pair, RelativePose_Info>& relativePoses);
