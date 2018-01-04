@@ -28,7 +28,12 @@ namespace coloc
 {
 	class RobustMatcher {
 	public:
-		RobustMatcher(int, int);
+		RobustMatcher(std::pair <size_t, size_t> & size, Mat3& intrinsicMatrix)
+		{
+			this->imageSize = &size;
+			this->K = &intrinsicMatrix;
+		}
+
 
 		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair, std::map<IndexT, std::unique_ptr<features::Regions> >&, PairWiseMatches&);
 		void filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, std::map<Pair, RelativePose_Info>& relativePoses);
@@ -37,24 +42,13 @@ namespace coloc
 
 	private:
 		std::map<IndexT, std::unique_ptr<features::Regions> > featureRegions;
-		std::pair<size_t, size_t> imageSize;
+		std::pair<size_t, size_t> *imageSize;
 
 		int iterationCount = 256;
-
-		Mat3 K;
+		Mat3 *K;
 	};
 
-	RobustMatcher::RobustMatcher(int w, int h)
-	{
-		imageSize.first = w;
-		imageSize.second = h;
-
-
-		K << 320, 0, 320,
-			0, 320, 240,
-			0, 0, 1;
-	}
-
+	
 	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(Pair current_pair, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches)
 	{
 		const uint32_t I = std::min(current_pair.first, current_pair.second);
@@ -74,17 +68,14 @@ namespace coloc
 		RelativePose_Info relativePose;
 
 		const openMVG::cameras::Pinhole_Intrinsic
-			camL(imageSize.first, imageSize.second, K(0, 0), K(0, 2), K(1, 2)),
-			camR(imageSize.first, imageSize.second, K(0, 0), K(0, 2), K(1, 2));
+			camL(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2)),
+			camR(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
 
-		if (!robustRelativePose(&camL, &camR, xL, xR, relativePose, imageSize, imageSize, iterationCount))
-		{
-			std::cerr << " /!\\ Robust relative pose estimation failure."
-				<< std::endl;
+		if (!robustRelativePose(&camL, &camR, xL, xR, relativePose, *imageSize, *imageSize, iterationCount)) {
+			std::cerr << " /!\\ Robust relative pose estimation failure." << std::endl;
 		}
 
-		else
-		{
+		else {
 			std::cout << "\nFound an Essential matrix:\n"
 				<< "\tprecision: " << relativePose.found_residual_precision << " pixels\n"
 				<< "\t#inliers: " << relativePose.vec_inliers.size() << "\n"

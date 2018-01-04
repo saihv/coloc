@@ -15,7 +15,7 @@ namespace coloc
 	public:
 		FeatureExtractor(std::string& method);
 		void detectFeatures(unsigned int index, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName);
-		void saveFeatureData(std::string& imageName);
+		void saveFeatureData(uint16_t id, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& name);
 		// int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 
 	private:
@@ -40,9 +40,13 @@ namespace coloc
 		image_describer->Describe(imageGray, regions[index]);
 	}
 
-	void FeatureExtractor::saveFeatureData(std::string& imageName)
+	void FeatureExtractor::saveFeatureData(uint16_t id, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& name)
 	{
+		const std::string
+			sFeat = stlplus::create_filespec(stlplus::folder_part(name), stlplus::basename_part(name), "feat"),
+			sDesc = stlplus::create_filespec(stlplus::folder_part(name), stlplus::basename_part(name), "desc");
 
+		image_describer->Save(regions.at(id).get(), sFeat, sDesc);
 	}
 }
 

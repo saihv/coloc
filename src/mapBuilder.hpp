@@ -31,17 +31,13 @@ namespace coloc
 {
 	class Reconstructor {
 	public:
-		
-		Reconstructor(int w, int h) 
+		Reconstructor(std::pair <size_t, size_t> & size, Mat3& intrinsicMatrix)
 		{
-			imageSize.first = w;
-			imageSize.second = w;
-			K << 320, 0, 320,
-				0, 320, 240,
-				0, 0, 1;
+			this->imageSize = &size;
+			this->K = &intrinsicMatrix;
 		}
 
-		void reconstructScene(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, LocalizationData& data);
+		void reconstructScene(LocalizationData& data);
 
 	private:
 		// Internal methods
@@ -59,8 +55,8 @@ namespace coloc
 		openMVG::tracks::STLMAPTracks mapTracks, mapTracksCommon;
 		std::unique_ptr<openMVG::tracks::SharedTrackVisibilityHelper> trackVisibility;
 		cameras::Pinhole_Intrinsic *cam_I, *cam_J;
-		std::pair <size_t, size_t> imageSize;
-		Mat3 K;
+		std::pair <size_t, size_t> *imageSize;
+		Mat3 *K;
 
 		// Local pointers to external localization data
 
@@ -70,9 +66,9 @@ namespace coloc
 		SfM_Data* scene;
 	};
 	
-	void Reconstructor::reconstructScene(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, LocalizationData& data)
+	void Reconstructor::reconstructScene(LocalizationData& data)
 	{
-		this->regionsRCT = &regions;
+		this->regionsRCT = &data.regions;
 		this->matchesRCT = &data.geometricMatches;
 		this->relativePosesRCT = &data.relativePoses;
 		this->scene = &data.scene;
@@ -106,10 +102,7 @@ namespace coloc
 
 	void Reconstructor::initializeScene(int w, int h)
 	{
-		this->scene->views[0].reset(new View("", 0, 0, 0, w, h));
-		this->scene->views[1].reset(new View("", 1, 0, 1, w, h));
-
-		this->scene->intrinsics[0].reset(new cameras::Pinhole_Intrinsic(w, h, K(0, 0), K(0, 2), K(1, 2)));
+		this->scene->intrinsics[0].reset(new cameras::Pinhole_Intrinsic(w, h, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2)));
 
 		this->cam_I = dynamic_cast<cameras::Pinhole_Intrinsic*> (scene->intrinsics[0].get());
 		this->cam_J = dynamic_cast<cameras::Pinhole_Intrinsic*> (scene->intrinsics[0].get());
@@ -205,7 +198,7 @@ namespace coloc
 		resection_data.pt2D.resize(2, set_trackIdForResection.size());
 		resection_data.pt3D.resize(3, set_trackIdForResection.size());
 
-		scene->views[id].reset(new View("", 2, 0, 2, imageSize.first, imageSize.second));
+		
 
 		const View * view_I = scene->GetViews().at(id).get();
 		std::shared_ptr<cameras::IntrinsicBase> optional_intrinsic(nullptr);
