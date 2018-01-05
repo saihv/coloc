@@ -69,7 +69,7 @@ namespace coloc
 		double pose_center_robust_fitting_error = 0.0;
 		openMVG::geometry::Similarity3 sim_to_center;
 		bool b_usable_prior = false;
-		
+
 		ceres::Problem problem;
 
 		// Data wrapper for refinement:
@@ -121,50 +121,56 @@ namespace coloc
 			}
 		}
 
+		// Setup Intrinsics data & subparametrization
+		for (const auto & intrinsic_it : scene.intrinsics)
+		{
+			const IndexT indexCam = intrinsic_it.first;
+
+			if (isValid(intrinsic_it.second->getType()))
+			{
+				map_intrinsics[indexCam] = intrinsic_it.second->getParams();
+				if (!map_intrinsics.at(indexCam).empty())
+				{
+					double * parameter_block = &map_intrinsics.at(indexCam)[0];
+					problem.AddParameterBlock(parameter_block, map_intrinsics.at(indexCam).size());
+					if (options.intrinsics_opt == Intrinsic_Parameter_Type::NONE)
+					{
+						// set the whole parameter block as constant for best performance
+						problem.SetParameterBlockConstant(parameter_block);
+					}
+				}
+			}
+		}
+
 		// Set a LossFunction to be less penalized by false measurements
 		//  - set it to nullptr if you don't want use a lossFunction.
-		ceres::LossFunction * p_LossFunction =
-			ceresOptions.bUse_loss_function_ ?
-			new ceres::HuberLoss(Square(4.0))
-			: nullptr;
+		ceres::LossFunction * p_LossFunction = ceresOptions.bUse_loss_function_ ? new ceres::HuberLoss(Square(4.0)) : nullptr;
 
 		// For all visibility add reprojections errors:
-		for (auto & structure_landmark_it : scene.structure)
-		{
+		for (auto & structure_landmark_it : scene.structure) {
 			const Observations & obs = structure_landmark_it.second.obs;
 
-			for (const auto & obs_it : obs)
-			{
+			for (const auto & obs_it : obs) {
 				// Build the residual block corresponding to the track observation:
 				const View * view = scene.views.at(obs_it.first).get();
 
 				// Each Residual block takes a point and a camera as input and outputs a 2
 				// dimensional residual. Internally, the cost function stores the observed
 				// image location and compares the reprojection against the observation.
-				ceres::CostFunction* cost_function =
-					IntrinsicsToCostFunction(scene.intrinsics.at(view->id_intrinsic).get(),
-						obs_it.second.x);
+				ceres::CostFunction* cost_function = IntrinsicsToCostFunction(scene.intrinsics.at(view->id_intrinsic).get(),
+																			obs_it.second.x);
 
-				if (cost_function)
-				{
-					if (!map_intrinsics.at(view->id_intrinsic).empty())
-					{
-						problem.AddResidualBlock(cost_function,
-							p_LossFunction,
-							&map_intrinsics.at(view->id_intrinsic)[0],
-							&map_poses.at(view->id_pose)[0],
-							structure_landmark_it.second.X.data());
+				if (cost_function) {
+					if (!map_intrinsics.at(view->id_intrinsic).empty()) {
+						problem.AddResidualBlock(cost_function, p_LossFunction, &map_intrinsics.at(view->id_intrinsic)[0], 
+												&map_poses.at(view->id_pose)[0], structure_landmark_it.second.X.data());
 					}
-					else
-					{
-						problem.AddResidualBlock(cost_function,
-							p_LossFunction,
-							&map_poses.at(view->id_pose)[0],
-							structure_landmark_it.second.X.data());
+					else {
+						problem.AddResidualBlock(cost_function,	p_LossFunction, &map_poses.at(view->id_pose)[0], 
+												structure_landmark_it.second.X.data());
 					}
 				}
-				else
-				{
+				else {
 					std::cerr << "Cannot create a CostFunction for this camera model." << std::endl;
 					return false;
 				}
@@ -173,41 +179,36 @@ namespace coloc
 				problem.SetParameterBlockConstant(structure_landmark_it.second.X.data());
 		}
 
-		
+
 		// Configure a BA engine and run it
 		//  Make Ceres automatically detect the bundle structure.
 		ceres::Solver::Options ceres_config_options;
 		ceres_config_options.max_num_iterations = 500;
-		ceres_config_options.preconditioner_type =
-			static_cast<ceres::PreconditionerType>(ceres_options_.preconditioner_type_);
-		ceres_config_options.linear_solver_type =
-			static_cast<ceres::LinearSolverType>(ceres_options_.linear_solver_type_);
-		ceres_config_options.sparse_linear_algebra_library_type =
-			static_cast<ceres::SparseLinearAlgebraLibraryType>(ceres_options_.sparse_linear_algebra_library_type_);
-		ceres_config_options.minimizer_progress_to_stdout = ceres_options_.bVerbose_;
+		ceres_config_options.preconditioner_type = static_cast<ceres::PreconditionerType>(ceresOptions.preconditioner_type_);
+		ceres_config_options.linear_solver_type = static_cast<ceres::LinearSolverType>(ceresOptions.linear_solver_type_);
+		ceres_config_options.sparse_linear_algebra_library_type = static_cast<ceres::SparseLinearAlgebraLibraryType>(ceresOptions.sparse_linear_algebra_library_type_);
+		ceres_config_options.minimizer_progress_to_stdout = ceresOptions.bVerbose_;
 		ceres_config_options.logging_type = ceres::SILENT;
-		ceres_config_options.num_threads = ceres_options_.nb_threads_;
-		ceres_config_options.num_linear_solver_threads = ceres_options_.nb_threads_;
-		ceres_config_options.parameter_tolerance = ceres_options_.parameter_tolerance_;
+		ceres_config_options.num_threads = ceresOptions.nb_threads_;
+		ceres_config_options.num_linear_solver_threads = ceresOptions.nb_threads_;
+		ceres_config_options.parameter_tolerance = ceresOptions.parameter_tolerance_;
 
 		// Solve BA
 		ceres::Solver::Summary summary;
 		ceres::Solve(ceres_config_options, &problem, &summary);
-		if (ceres_options_.bCeres_summary_)
+		if (ceresOptions.bCeres_summary_)
 			std::cout << summary.FullReport() << std::endl;
 
 		// If no error, get back refined parameters
 		if (!summary.IsSolutionUsable())
 		{
-			if (ceres_options_.bVerbose_)
+			if (ceresOptions.bVerbose_)
 				std::cout << "Bundle Adjustment failed." << std::endl;
 			return false;
 		}
 		else // Solution is usable
 		{
-			if (ceres_options_.bVerbose_)
-			{
-				// Display statistics about the minimization
+			if (ceresOptions.bVerbose_) {
 				std::cout << std::endl
 					<< "Bundle Adjustment statistics (approximated RMSE):\n"
 					<< " #views: " << scene.views.size() << "\n"
@@ -224,8 +225,7 @@ namespace coloc
 			}
 
 			// Update camera poses with refined data
-			if (options.extrinsics_opt != Extrinsic_Parameter_Type::NONE)
-			{
+			if (options.extrinsics_opt != Extrinsic_Parameter_Type::NONE) {
 				for (auto & pose_it : scene.poses)
 				{
 					const IndexT indexPose = pose_it.first;
@@ -238,42 +238,7 @@ namespace coloc
 					pose = Pose3(R_refined, -R_refined.transpose() * t_refined);
 				}
 			}
-			
-			// Structure is already updated directly if needed (no data wrapping)
-
-			if (b_usable_prior)
-			{
-				// set back to the original scene centroid
-				openMVG::sfm::ApplySimilarity(sim_to_center.inverse(), scene, true);
-
-				//--
-				// - Compute some fitting statistics
-				//--
-
-				// Collect corresponding camera centers
-				std::vector<Vec3> X_SfM, X_GPS;
-				for (const auto & view_it : scene.GetViews())
-				{
-					const sfm::ViewPriors * prior = dynamic_cast<sfm::ViewPriors*>(view_it.second.get());
-					if (prior != nullptr && prior->b_use_pose_center_ && scene.IsPoseAndIntrinsicDefined(prior))
-					{
-						X_SfM.push_back(scene.GetPoses().at(prior->id_pose).center());
-						X_GPS.push_back(prior->pose_center_);
-					}
-				}
-				// Compute the registration fitting error (once BA with Prior have been used):
-				if (X_GPS.size() > 3)
-				{
-					// Compute the median residual error
-					Vec residual = (Eigen::Map<Mat3X>(X_SfM[0].data(), 3, X_SfM.size()) - Eigen::Map<Mat3X>(X_GPS[0].data(), 3, X_GPS.size())).colwise().norm();
-					std::cout
-						<< "Pose prior statistics (user units):\n"
-						<< " - Starting median fitting error: " << pose_center_robust_fitting_error << "\n"
-						<< " - Final fitting error:";
-					minMaxMeanMedian<Vec::Scalar>(residual.data(), residual.data() + residual.size());
-				}
-			}
 			return true;
+		}
 	}
-
 }

@@ -7,6 +7,7 @@
 #include "openMVG/features/feature.hpp"
 #include "nonFree/sift/SIFT_describer_io.hpp"
 #include "openMVG/sfm/sfm.hpp"
+#include "poseRefiner.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -37,6 +38,7 @@ namespace coloc
 		bool setupMap(LocalizationData&);
 		bool initMatchingInterface(SfM_Data&, Regions_Provider&);
 		bool matchLocalize(const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * correspondenceData_ptr);
+		bool refine(Pose3& pose, Image_Localizer_Match_Data& matchData);
 		
 	private:
 		std::unique_ptr<features::Image_describer> image_describer;
@@ -175,7 +177,42 @@ namespace coloc
 		}
 		else {
 			std::cout << "Localization successful" << std::endl;
+			refine(pose, matching_data);
 			return EXIT_SUCCESS;
 		}
+
+	}
+
+	bool Localizer::refine(Pose3& pose, Image_Localizer_Match_Data& matchData)
+	{
+		SfM_Data scene;
+		scene.views.insert({ 0, std::make_shared<View>("",0, 0, 0) });
+		scene.poses[0] = pose;
+		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
+		std::shared_ptr<cameras::IntrinsicBase> shared_intrinsics(cam.clone());
+		scene.intrinsics[0] = shared_intrinsics;
+		// structure data (2D-3D correspondences)
+		for (size_t i = 0; i < matchData.vec_inliers.size(); ++i)
+		{
+			const size_t idx = matchData.vec_inliers[i];
+			Landmark landmark;
+			landmark.X = matchData.pt3D.col(idx);
+			landmark.obs[0] = Observation(matchData.pt2D.col(idx), UndefinedIndexT);
+			scene.structure[i] = std::move(landmark);
+		}
+
+		// Configure BA options (refine the intrinsic and the pose parameter only if requested)
+		const Optimize_Options ba_refine_options
+		(cameras::Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::NONE);
+		PoseRefiner refiner;
+		const bool b_BA_Status = refiner.refinePose(
+			scene,
+			ba_refine_options);
+		if (b_BA_Status)
+		{
+			pose = scene.poses[0];
+		}
+
+		return b_BA_Status;
 	}
 }

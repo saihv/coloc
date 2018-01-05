@@ -48,7 +48,7 @@ int main()
 	data.scene.s_root_path = params.imageFolder;
 	bool mapReady = localizer.setupMap(data);
 
-	if (mapReady) {
+	if (!mapReady) {
 		Pose3 pose;
 		localizer.localizeImage(filename[1], pose);
 	}
