@@ -71,7 +71,7 @@ namespace coloc
 
 		mapFeatures->load(data.scene, folderName, regions_type, &progress);
 
-		if (!initMatchingInterface(data.scene, *mapFeatures.get())) {
+		if (initMatchingInterface(data.scene, *mapFeatures.get())) {
 			std::cerr << "Cannot initialize the SfM localizer" << std::endl;
 			return EXIT_FAILURE;
 		}
@@ -98,8 +98,8 @@ namespace coloc
 			{
 				if (observation.second.id_feat != UndefinedIndexT)
 				{
-					const std::shared_ptr<features::Regions> view_regions = mapFeatures.get(observation.first);
-					view_regions->CopyRegion(observation.second.id_feat, mapDesc.get());
+					const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(observation.first);
+					viewRegions->CopyRegion(observation.second.id_feat, mapDesc.get());
 					mapDescIdx.push_back(landmark.first);
 				}
 			}

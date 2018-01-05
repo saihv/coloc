@@ -46,10 +46,12 @@ int main()
 	reconstructor.reconstructScene(data);
 
 	data.scene.s_root_path = params.imageFolder;
-	localizer.setupMap(data);
+	bool mapReady = localizer.setupMap(data);
 
-	Pose3 pose;
-	localizer.localizeImage(filename[1], pose);
+	if (mapReady) {
+		Pose3 pose;
+		localizer.localizeImage(filename[1], pose);
+	}
 
 	return 0;
 }

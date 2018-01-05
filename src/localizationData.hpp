@@ -49,6 +49,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+
 using namespace openMVG;
 using namespace openMVG::features;
 using namespace openMVG::matching;

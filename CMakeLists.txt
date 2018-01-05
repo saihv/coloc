@@ -29,7 +29,8 @@ endif(OPENMP_FOUND)
 
 include_directories(
     ${OPENMVG_INCLUDE_DIRS}
-    ${Eigen_INCLUDE_DIRS}
+    ${Eigen_INCLUDE_DIRS} 
+    ${CERES_INCLUDE_DIRS}
 )
 
 file(
@@ -51,6 +52,8 @@ target_link_libraries(coloc
   openMVG_multiview
   openMVG_matching_image_collection
   openMVG_sfm
+  openMVG_geometry
+  ceres
   stlplus
   easyexif
   vlsift)
