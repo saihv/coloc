@@ -25,6 +25,7 @@ int main()
 	coloc::RobustMatcher robustMatcher(params);
 	coloc::Reconstructor reconstructor(params);
 	coloc::Localizer localizer(params);
+	coloc::Utils utils;
 
 	unsigned int numDrones = 2;
 
@@ -49,11 +50,11 @@ int main()
 	reconstructor.reconstructScene(data, origin, 15.0);
 
 	data.scene.s_root_path = params.imageFolder;
-	bool mapReady = localizer.setupMap(data);
+	bool mapReady = utils.setupMap(data, params);
 
 	if (!mapReady) {
 		Pose3 pose;
-		localizer.localizeImage(filename[2], pose);
+		localizer.localizeImage(filename[2], pose, data);
 	}
 
 	return 0;

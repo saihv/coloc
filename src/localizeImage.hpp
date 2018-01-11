@@ -8,6 +8,7 @@
 #include "nonFree/sift/SIFT_describer_io.hpp"
 #include "openMVG/sfm/sfm.hpp"
 #include "poseRefiner.hpp"
+#include "localizationUtils.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -34,10 +35,8 @@ namespace coloc
 		}
 
 		std::unique_ptr<features::Regions> regionsCurrent;
-		bool localizeImage(std::string& imageName, geometry::Pose3& pose);
-		bool setupMap(LocalizationData&);
-		bool initMatchingInterface(SfM_Data&, Regions_Provider&);
-		bool matchLocalize(const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * correspondenceData_ptr);
+		bool localizeImage(std::string& imageName, geometry::Pose3& pose, LocalizationData &data);
+		bool matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr);
 		bool refine(Pose3& pose, Image_Localizer_Match_Data& matchData);
 		
 	private:
@@ -50,15 +49,12 @@ namespace coloc
 
 		std::unique_ptr<Regions> regions_type;
 		std::shared_ptr<Regions_Provider> mapFeatures = std::make_shared<Regions_Provider>();
-		sfm::SfM_Localization_Single_3DTrackObservation_Database localizationDatabase;
 
-		std::unique_ptr<features::Regions> mapDesc;
-		std::vector<IndexT> mapDescIdx;
 		std::shared_ptr<matching::Matcher_Regions_Database> matchInterface;
 
-		
+		Utils locUtils;
 	};
-
+	/*
 	bool Localizer::setupMap(LocalizationData& data)
 	{
 		if (data.scene.GetPoses().empty() || data.scene.GetLandmarks().empty()) {
@@ -112,11 +108,12 @@ namespace coloc
 		std::cout << "Retrieval database initialized with:\n"
 			<< "#landmarks: " << scene.GetLandmarks().size() << "\n"
 			<< "#descriptors: " << mapDesc->RegionCount() << std::endl;
-			*/
+			
 		return EXIT_SUCCESS;
 	}
+	*/
 
-	bool Localizer::matchLocalize(const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * correspondenceData_ptr)
+	bool Localizer::matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr)
 	{
 		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
 		
@@ -127,8 +124,8 @@ namespace coloc
 		//if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
 
 		matching::DistanceRatioMatch(
-			1 - correspondenceData_ptr->error_max, matching::BRUTE_FORCE_HAMMING,
-			*mapDesc.get(),
+			1 - trackPtr->error_max, matching::BRUTE_FORCE_HAMMING,
+			*data.mapRegions.get(),
 			queryRegions,
 			trackedFeatures);
 
@@ -140,33 +137,35 @@ namespace coloc
 
 		std::cout << "Number of tracked features: " << trackedFeatures.size() << std::endl;
 
-		Image_Localizer_Match_Data correspondenceData;
-		if (correspondenceData_ptr)
-			correspondenceData.error_max = correspondenceData_ptr->error_max;
+		Image_Localizer_Match_Data trackData;
+		if (trackPtr)
+			trackData.error_max = trackPtr->error_max;
 		
-		correspondenceData.pt3D.resize(3, trackedFeatures.size());
-		correspondenceData.pt2D.resize(2, trackedFeatures.size());
+		trackData.pt3D.resize(3, trackedFeatures.size());
+		trackData.pt2D.resize(2, trackedFeatures.size());
 		Mat2X pt2D_original(2, trackedFeatures.size());
+
+		scenePtr = &data.scene;
 		for (size_t i = 0; i < trackedFeatures.size(); ++i)
 		{
-			correspondenceData.pt3D.col(i) = scenePtr->GetLandmarks().at(mapDescIdx[trackedFeatures[i].i_]).X;
-			correspondenceData.pt2D.col(i) = queryRegions.GetRegionPosition(trackedFeatures[i].j_);
-			pt2D_original.col(i) = correspondenceData.pt2D.col(i);
+			trackData.pt3D.col(i) = scenePtr->GetLandmarks().at(data.mapRegionIdx[trackedFeatures[i].i_]).X;
+			trackData.pt2D.col(i) = queryRegions.GetRegionPosition(trackedFeatures[i].j_);
+			pt2D_original.col(i) = trackData.pt2D.col(i);
 
 			if (&cam && cam.have_disto())
-				correspondenceData.pt2D.col(i) = cam.get_ud_pixel(correspondenceData.pt2D.col(i));
+				trackData.pt2D.col(i) = cam.get_ud_pixel(trackData.pt2D.col(i));
 		}
 
-		bool localizationStatus = SfM_Localizer::Localize(resection::SolverType::P3P_KE_CVPR17, *imageSize, &cam, correspondenceData, pose);
-		correspondenceData.pt2D = std::move(pt2D_original);
+		bool localizationStatus = SfM_Localizer::Localize(resection::SolverType::P3P_KE_CVPR17, *imageSize, &cam, trackData, pose);
+		trackData.pt2D = std::move(pt2D_original);
 
-		if (correspondenceData_ptr)
-			(*correspondenceData_ptr) = std::move(correspondenceData);
+		if (trackPtr)
+			(*trackPtr) = std::move(trackData);
 
 		return localizationStatus;
 	}
 	
-	bool Localizer::localizeImage(std::string& imageName, geometry::Pose3& pose)
+	bool Localizer::localizeImage(std::string& imageName, geometry::Pose3& pose, LocalizationData &data)
 	{
 		using namespace openMVG::features;
 
@@ -181,7 +180,7 @@ namespace coloc
 		sfm::Image_Localizer_Match_Data matching_data;
 		matching_data.error_max = 0.2;
 
-		if (!this->matchLocalize(*(regionsCurrent.get()), pose, &matching_data)) {
+		if (!this->matchLocalize(data, *regionsCurrent.get(), pose, &matching_data)) {
 			std::cout << "Localization unsuccessful" << std::endl;
 			return EXIT_FAILURE;
 		}
