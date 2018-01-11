@@ -63,7 +63,8 @@ namespace coloc
 	class Utils
 	{
 	public:
-		bool matchMaps(SfM_Data scene1, SfM_Data scene2);
+		void matchMaps(LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures);
+		bool computeScaleDifference(LocalizationData &data1, LocalizationData &data2, float &scaleDiff);
 		bool matchSceneWithMap(SfM_Data scene);
 		bool setupMap(LocalizationData&, LocalizationParams&);
 		bool initMapMatchingInterface(LocalizationData &data, Regions_Provider &mapFeatures);
@@ -106,16 +107,68 @@ namespace coloc
 		data.mapRegions.reset(mapFeatures.getRegionsType()->EmptyClone());
 		for (const auto & landmark : data.scene.GetLandmarks())
 		{
-			for (const auto & observation : landmark.second.obs)
-			{
-				if (observation.second.id_feat != UndefinedIndexT)
+				if (landmark.second.obs.at(0).id_feat != UndefinedIndexT)
 				{
-					const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(observation.first);
-					viewRegions->CopyRegion(observation.second.id_feat, data.mapRegions.get());
+					const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(0);
+					viewRegions->CopyRegion(landmark.second.obs.at(0).id_feat, data.mapRegions.get());
 					data.mapRegionIdx.push_back(landmark.first);
 				}
-			}
 		}
 		return EXIT_SUCCESS;
 	}
+
+	void Utils::matchMaps(LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures)
+	{
+		matching::DistanceRatioMatch(
+			0.2, matching::BRUTE_FORCE_HAMMING,
+			*data1.mapRegions.get(),
+			*data2.mapRegions.get(),
+			commonFeatures);
+
+	}
+
+	bool Utils::computeScaleDifference(LocalizationData &data1, LocalizationData &data2, float &scaleDiff)
+	{
+		std::vector<IndMatch> commonFeatures;
+		matchMaps(data1, data2, commonFeatures);
+
+		if (commonFeatures.empty())
+		{
+			std::cout << "No common features between the maps." << std::endl;
+			return EXIT_FAILURE;
+		}
+
+		std::cout << "Number of common features: " << commonFeatures.size() << std::endl;
+
+		Mat pt3D_1, pt3D_2;
+		
+		pt3D_1.resize(3, commonFeatures.size());
+		pt3D_2.resize(3, commonFeatures.size());
+
+		float scale = 0.0;
+
+		for (size_t i = 0; i < commonFeatures.size(); ++i)
+		{
+			pt3D_1.col(i) = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
+			pt3D_2.col(i) = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i].j_]).X;			
+		}
+
+		for (size_t i = 0; i < commonFeatures.size() - 1; ++i)
+		{
+			Vec3 X11 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
+			Vec3 X12 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i+1].i_]).X;
+			
+			Vec3 X21 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i].j_]).X;
+			Vec3 X22 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i + 1].j_]).X;
+
+			float dist1 = (X12 - X11).norm();
+			float dist2 = (X22 - X21).norm();
+
+			scale += std::max(dist1, dist2) / std::min(dist1, dist2);
+		}
+
+		scaleDiff = scale / (commonFeatures.size() - 1);
+	}
+
+
 }

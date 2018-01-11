@@ -12,7 +12,7 @@ namespace fs = std::experimental::filesystem;
 
 int main()
 {
-	coloc::LocalizationData data;
+	coloc::LocalizationData data, data2;
 	coloc::LocalizationParams params;
 
 	params.featureDetectorType = "AKAZE";
@@ -51,11 +51,37 @@ int main()
 
 	data.scene.s_root_path = params.imageFolder;
 	bool mapReady = utils.setupMap(data, params);
-
+	/*
 	if (!mapReady) {
 		Pose3 pose;
 		localizer.localizeImage(filename[2], pose, data);
 	}
+	*/
+
+	for (unsigned int i = 0; i < numDrones; ++i) {
+		detector.detectFeatures(i, data2.regions, filename[i]);
+		detector.saveFeatureData(i, data2.regions, filename[i]);
+
+		data2.scene.views[i].reset(new View(filename[i], i, 0, i, params.imageSize.first, params.imageSize.second));
+	}
+
+	matcher.computeMatches(data2.regions, data2.putativeMatches);
+	robustMatcher.filterMatches(data2.regions, data2.putativeMatches, data2.geometricMatches, data2.relativePoses);
+
+	coloc::Reconstructor reconstructor2(params);
+	reconstructor2.reconstructScene(data2, origin, 1.0);
+
+	coloc::Utils utils2;
+
+	data2.scene.s_root_path = params.imageFolder;
+	mapReady = utils2.setupMap(data2, params);
+
+	float scaleDiff;
+	utils.computeScaleDifference(data, data2, scaleDiff);
+
+	std::cout << "Difference between scale factors is " << scaleDiff << std::endl;
+
+	
 
 	return 0;
 }
