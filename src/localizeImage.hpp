@@ -66,7 +66,7 @@ namespace coloc
 			return EXIT_FAILURE;
 		}
 
-		std::string folderName = "C:/Users/saihv/Desktop/test";
+		std::string folderName = "C:/Users/saihv/Desktop/testnew";
 		C_Progress_display progress;
 		std::unique_ptr<Regions> regions_type;
 		regions_type.reset(new features::AKAZE_Binary_Regions());
@@ -106,12 +106,13 @@ namespace coloc
 				}
 			}
 		}
+		/*
 		std::cout << "Init retrieval database ... " << std::endl;
 		matchInterface.reset(new matching::Matcher_Regions_Database(matching::BRUTE_FORCE_HAMMING, *mapDesc));
 		std::cout << "Retrieval database initialized with:\n"
 			<< "#landmarks: " << scene.GetLandmarks().size() << "\n"
 			<< "#descriptors: " << mapDesc->RegionCount() << std::endl;
-
+			*/
 		return EXIT_SUCCESS;
 	}
 
@@ -119,12 +120,23 @@ namespace coloc
 	{
 		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
 		
-		if (scenePtr == nullptr || matchInterface == nullptr)
+		if (scenePtr == nullptr)
 			return EXIT_FAILURE;
 
-		matching::IndMatches trackedFeatures;
-		if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
+		std::vector<IndMatch> trackedFeatures;
+		//if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
+
+		matching::DistanceRatioMatch(
+			1 - correspondenceData_ptr->error_max, matching::BRUTE_FORCE_HAMMING,
+			*mapDesc.get(),
+			queryRegions,
+			trackedFeatures);
+
+		if (trackedFeatures.empty())
+		{
+			std::cout << "Unable to track any features" << std::endl;
 			return EXIT_FAILURE;
+		}
 
 		std::cout << "Number of tracked features: " << trackedFeatures.size() << std::endl;
 
@@ -142,9 +154,7 @@ namespace coloc
 			pt2D_original.col(i) = correspondenceData.pt2D.col(i);
 
 			if (&cam && cam.have_disto())
-			{
 				correspondenceData.pt2D.col(i) = cam.get_ud_pixel(correspondenceData.pt2D.col(i));
-			}
 		}
 
 		bool localizationStatus = SfM_Localizer::Localize(resection::SolverType::P3P_KE_CVPR17, *imageSize, &cam, correspondenceData, pose);

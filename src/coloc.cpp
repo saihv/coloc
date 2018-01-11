@@ -18,7 +18,7 @@ int main()
 	params.featureDetectorType = "AKAZE";
 	params.imageSize = std::make_pair(640, 480);
 	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
-	params.imageFolder = "C:/Users/saihv/Desktop/test/";
+	params.imageFolder = "C:/Users/saihv/Desktop/testnew/";
 
 	coloc::FeatureExtractor detector(params);
 	coloc::FeatureMatcher matcher(params);
@@ -26,13 +26,13 @@ int main()
 	coloc::Reconstructor reconstructor(params);
 	coloc::Localizer localizer(params);
 
-	unsigned int numDrones = 3;
+	unsigned int numDrones = 2;
 
 	std::string filename[3];	
 
-	filename[0] = "C:/Users/saihv/Desktop/test/img__Quad0_0.png";
-	filename[1] = "C:/Users/saihv/Desktop/test/img__Quad1_0.png";
-	filename[2] = "C:/Users/saihv/Desktop/test/img__Quad2_0.png";
+	filename[0] = "C:/Users/saihv/Desktop/testnew/img__Quad0_0000.png";
+	filename[1] = "C:/Users/saihv/Desktop/testnew/img__Quad1_0000.png";
+	filename[2] = "C:/Users/saihv/Desktop/testnew/img__Quad2_0000.png";
 
 	for (unsigned int i = 0; i < numDrones; ++i) {
 		detector.detectFeatures(i, data.regions, filename[i]);
@@ -43,14 +43,17 @@ int main()
 
 	matcher.computeMatches(data.regions, data.putativeMatches);
 	robustMatcher.filterMatches(data.regions, data.putativeMatches, data.geometricMatches, data.relativePoses);
-	reconstructor.reconstructScene(data);
+
+	Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
+
+	reconstructor.reconstructScene(data, origin, 15.0);
 
 	data.scene.s_root_path = params.imageFolder;
 	bool mapReady = localizer.setupMap(data);
 
 	if (!mapReady) {
 		Pose3 pose;
-		localizer.localizeImage(filename[1], pose);
+		localizer.localizeImage(filename[2], pose);
 	}
 
 	return 0;

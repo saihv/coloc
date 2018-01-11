@@ -39,17 +39,18 @@ namespace coloc
 			this->currentFolder = &params.imageFolder;
 		}
 
-		void reconstructScene(LocalizationData& data);
+		void reconstructScene(LocalizationData& data, Pose3, float);
 
 	private:
 		// Internal methods
 
 		void initializeTracks(Pair& viewPair);
 		void initializeScene(int w, int h);
-		void triangulatePoints();
-		void constructProjectionsTriangulation(Mat34& P1, Mat34& P2);
+		void triangulatePoints(Pose3&, float&);
+		void constructProjectionsTriangulation(Pose3&, Pose3&, Mat34& P1, Mat34& P2);
 		bool resectionCamera(unsigned int);
 		bool saveSceneData(SfM_Data* scene);
+		Pose3 relativePoseToAbsolute(Pose3&, Pose3&);
 
 		// Internal variables
 
@@ -69,7 +70,7 @@ namespace coloc
 		SfM_Data* scene;
 	};
 	
-	void Reconstructor::reconstructScene(LocalizationData& data)
+	void Reconstructor::reconstructScene(LocalizationData& data, Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero()), float scale = 1.0)
 	{
 		this->regionsRCT = &data.regions;
 		this->matchesRCT = &data.geometricMatches;
@@ -89,9 +90,8 @@ namespace coloc
 
 		initializeTracks(seedPair);
 		initializeScene(640, 480);
-		triangulatePoints();	
+		triangulatePoints(origin, scale);	
 		saveSceneData(this->scene);
-		resectionCamera(2);
 	}
 	
 	void Reconstructor::initializeTracks(Pair& viewPair)
@@ -111,7 +111,7 @@ namespace coloc
 		this->cam_J = dynamic_cast<cameras::Pinhole_Intrinsic*> (scene->intrinsics[0].get());
 	}
 	
-	void Reconstructor::triangulatePoints()
+	void Reconstructor::triangulatePoints(Pose3 &origin, float &scale)
 	{
 		const size_t n = mapTracksCommon.size();
 		Mat xI(2, n), xJ(2, n);
@@ -144,8 +144,15 @@ namespace coloc
 			const Vec2 x2_ = regionsRCT->at(1)->GetRegionsPositions()[j].coords().cast<double>();
 
 			Vec3 X;
+
+			Pose3 Pose_I = scene->poses[scene->views[0]->id_pose] = origin;
+
+			Mat3 Rrelative = relativePosesRCT->at({ 0,1 }).relativePose.rotation();
+			Vec3 Trelative = relativePosesRCT->at({ 0,1 }).relativePose.translation();
+			Pose3 Pose_J = scene->poses[scene->views[1]->id_pose] = relativePoseToAbsolute(origin, Pose3(Rrelative, scale*Trelative));
+
 			Mat34 P1, P2;
-			constructProjectionsTriangulation(P1, P2);
+			constructProjectionsTriangulation(Pose_I, Pose_J, P1, P2);
 			TriangulateDLT(P1, x1_.homogeneous(), P2, x2_.homogeneous(), &X);
 			Observations obs;
 			obs[scene->views[0]->id_view] = Observation(x1_, i);
@@ -155,13 +162,25 @@ namespace coloc
 		}
 	}
 
-	void Reconstructor::constructProjectionsTriangulation(Mat34& P1, Mat34& P2)
+	void Reconstructor::constructProjectionsTriangulation(Pose3 &pose1, Pose3 &pose2, Mat34& P1, Mat34& P2)
 	{
-		const Pose3 Pose_I = scene->poses[scene->views[0]->id_pose] = Pose3(Mat3::Identity(), Vec3::Zero());
-		const Pose3 Pose_J = scene->poses[scene->views[1]->id_pose] = relativePosesRCT->at({ 0,1 }).relativePose;
+		P1 = camCurrent->get_projective_equivalent(pose1);
+		P2 = cam_J->get_projective_equivalent(pose2);
+	}
 
-		P1 = camCurrent->get_projective_equivalent(Pose_I);
-		P2 = cam_J->get_projective_equivalent(Pose_J);
+	Pose3 Reconstructor::relativePoseToAbsolute(Pose3 &relativePose, Pose3 &origin)
+	{
+		Mat3 R1 = origin.rotation();
+		Mat3 R2 = relativePose.rotation();
+
+		Mat3 Rfinal = R2*R1;
+
+		Vec3 t1 = origin.translation();
+		Vec3 t2 = relativePose.translation();
+
+		Vec3 tfinal = t1 + t2;
+
+		return Pose3(Rfinal, tfinal);
 	}
 	
 	bool Reconstructor::resectionCamera(unsigned int id)
