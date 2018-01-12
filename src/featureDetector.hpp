@@ -27,7 +27,7 @@ namespace coloc
 		if (params.featureDetectorType == "SIFT")
 			image_describer.reset(new features::SIFT_Image_describer(features::SIFT_Image_describer::Params(), true));
 		else if (params.featureDetectorType == "AKAZE")
-			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
+			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MSURF), true);
 	}
 
 	void FeatureExtractor::detectFeatures(unsigned int index, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName)

@@ -18,7 +18,7 @@ int main()
 	params.featureDetectorType = "AKAZE";
 	params.imageSize = std::make_pair(640, 480);
 	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
-	params.imageFolder = "C:/Users/saihv/Desktop/testnew/";
+	params.imageFolder = "C:/Users/saihv/Desktop/testnewer/";
 
 	coloc::FeatureExtractor detector(params);
 	coloc::FeatureMatcher matcher(params);
@@ -31,9 +31,9 @@ int main()
 
 	std::string filename[3];	
 
-	filename[0] = "C:/Users/saihv/Desktop/testnew/img__Quad0_0000.png";
-	filename[1] = "C:/Users/saihv/Desktop/testnew/img__Quad1_0000.png";
-	filename[2] = "C:/Users/saihv/Desktop/testnew/img__Quad2_0000.png";
+	filename[0] = "C:/Users/saihv/Desktop/testnewer/img__Quad0_0000.png";
+	filename[1] = "C:/Users/saihv/Desktop/testnewer/img__Quad1_0002.png";
+	filename[2] = "C:/Users/saihv/Desktop/testnewer/img__Quad1_0250.png";
 
 	for (unsigned int i = 0; i < numDrones; ++i) {
 		detector.detectFeatures(i, data.regions, filename[i]);
@@ -47,17 +47,17 @@ int main()
 
 	Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
 
-	reconstructor.reconstructScene(data, origin, 15.0);
+	reconstructor.reconstructScene(data, origin, 1.0);
 
 	data.scene.s_root_path = params.imageFolder;
-	bool mapReady = utils.setupMap(data, params);
-	/*
+	bool mapReady = localizer.setupMap(data);
+	
+	Pose3 pose;
 	if (!mapReady) {
-		Pose3 pose;
+		
 		localizer.localizeImage(filename[2], pose, data);
 	}
-	*/
-
+	
 	for (unsigned int i = 0; i < numDrones; ++i) {
 		detector.detectFeatures(i, data2.regions, filename[i]);
 		detector.saveFeatureData(i, data2.regions, filename[i]);

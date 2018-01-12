@@ -36,7 +36,7 @@ namespace coloc
 	FeatureMatcher::FeatureMatcher(LocalizationParams& params) 
 	{
 		if (params.featureDetectorType == "AKAZE")
-			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
+			regions_type.reset(new openMVG::features::AKAZE_Float_Regions);
 		else if (params.featureDetectorType == "SIFT")
 			regions_type.reset(new openMVG::features::SIFT_Regions);
 	}
@@ -77,7 +77,7 @@ namespace coloc
 		std::vector<IndMatch> vec_PutativeMatches;
 
 		matching::DistanceRatioMatch(
-			0.8, matching::BRUTE_FORCE_HAMMING,
+			0.8, matching::CASCADE_HASHING_L2,
 			*regions1.get(),
 			*regions2.get(),
 			vec_PutativeMatches);

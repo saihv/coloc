@@ -27,7 +27,7 @@ namespace coloc
 			if (params.featureDetectorType == "SIFT")
 				image_describer.reset(new features::SIFT_Image_describer(features::SIFT_Image_describer::Params(), true));
 			else if (params.featureDetectorType == "AKAZE")
-				image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
+				image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MSURF), true);
 
 			this->imageSize = &params.imageSize;
 			this->K = &params.K;
@@ -38,6 +38,8 @@ namespace coloc
 		bool localizeImage(std::string& imageName, geometry::Pose3& pose, LocalizationData &data);
 		bool matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr);
 		bool refine(Pose3& pose, Image_Localizer_Match_Data& matchData);
+		bool setupMap(LocalizationData& data);
+		bool initMatchingInterface(SfM_Data& scene, Regions_Provider& mapFeatures);
 		
 	private:
 		std::unique_ptr<features::Image_describer> image_describer;
@@ -52,20 +54,22 @@ namespace coloc
 
 		std::shared_ptr<matching::Matcher_Regions_Database> matchInterface;
 
-		Utils locUtils;
+
+		std::unique_ptr<features::Regions> mapDesc;
+		std::vector<IndexT> mapDescIdx;
 	};
-	/*
+	
 	bool Localizer::setupMap(LocalizationData& data)
-	{
+	{		
 		if (data.scene.GetPoses().empty() || data.scene.GetLandmarks().empty()) {
 			std::cerr << "The input scene has no 3D content." << std::endl;
 			return EXIT_FAILURE;
 		}
 
-		std::string folderName = "C:/Users/saihv/Desktop/testnew";
+		std::string folderName = "C:/Users/saihv/Desktop/test";
 		C_Progress_display progress;
 		std::unique_ptr<Regions> regions_type;
-		regions_type.reset(new features::AKAZE_Binary_Regions());
+		regions_type.reset(new features::AKAZE_Float_Regions());
 
 		mapFeatures->load(data.scene, folderName, regions_type, &progress);
 
@@ -102,16 +106,16 @@ namespace coloc
 				}
 			}
 		}
-		/*
+		
 		std::cout << "Init retrieval database ... " << std::endl;
-		matchInterface.reset(new matching::Matcher_Regions_Database(matching::BRUTE_FORCE_HAMMING, *mapDesc));
+		matchInterface.reset(new matching::Matcher_Regions_Database(matching::CASCADE_HASHING_L2, *mapDesc));
 		std::cout << "Retrieval database initialized with:\n"
 			<< "#landmarks: " << scene.GetLandmarks().size() << "\n"
 			<< "#descriptors: " << mapDesc->RegionCount() << std::endl;
 			
 		return EXIT_SUCCESS;
 	}
-	*/
+	
 
 	bool Localizer::matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr)
 	{
@@ -121,15 +125,15 @@ namespace coloc
 			return EXIT_FAILURE;
 
 		std::vector<IndMatch> trackedFeatures;
-		//if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
+		if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
 
-		matching::DistanceRatioMatch(
-			1 - trackPtr->error_max, matching::BRUTE_FORCE_HAMMING,
-			*data.mapRegions.get(),
-			queryRegions,
-			trackedFeatures);
+		//matching::DistanceRatioMatch(
+		//	0.2, matching::CASCADE_HASHING_L2,
+		//	*data.mapRegions.get(),
+		//	queryRegions,
+		//	trackedFeatures);
 
-		if (trackedFeatures.empty())
+		//if (trackedFeatures.empty())
 		{
 			std::cout << "Unable to track any features" << std::endl;
 			return EXIT_FAILURE;
@@ -145,17 +149,16 @@ namespace coloc
 		trackData.pt2D.resize(2, trackedFeatures.size());
 		Mat2X pt2D_original(2, trackedFeatures.size());
 
-		scenePtr = &data.scene;
 		for (size_t i = 0; i < trackedFeatures.size(); ++i)
 		{
-			trackData.pt3D.col(i) = scenePtr->GetLandmarks().at(data.mapRegionIdx[trackedFeatures[i].i_]).X;
+			trackData.pt3D.col(i) = scenePtr->GetLandmarks().at(mapDescIdx[trackedFeatures[i].i_]).X;
 			trackData.pt2D.col(i) = queryRegions.GetRegionPosition(trackedFeatures[i].j_);
 			pt2D_original.col(i) = trackData.pt2D.col(i);
 
 			if (&cam && cam.have_disto())
 				trackData.pt2D.col(i) = cam.get_ud_pixel(trackData.pt2D.col(i));
 		}
-
+		
 		bool localizationStatus = SfM_Localizer::Localize(resection::SolverType::P3P_KE_CVPR17, *imageSize, &cam, trackData, pose);
 		trackData.pt2D = std::move(pt2D_original);
 
@@ -178,7 +181,7 @@ namespace coloc
 		std::cout << "#regions detected in query image: " << regionsCurrent->RegionCount() << std::endl;
 
 		sfm::Image_Localizer_Match_Data matching_data;
-		matching_data.error_max = 0.2;
+		matching_data.error_max = std::numeric_limits<double>::infinity();
 
 		if (!this->matchLocalize(data, *regionsCurrent.get(), pose, &matching_data)) {
 			std::cout << "Localization unsuccessful" << std::endl;

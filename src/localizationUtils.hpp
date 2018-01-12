@@ -82,7 +82,7 @@ namespace coloc
 
 		C_Progress_display progress;
 		std::unique_ptr<Regions> regions_type;
-		regions_type.reset(new features::AKAZE_Binary_Regions());
+		regions_type.reset(new features::AKAZE_Float_Regions());
 
 		mapFeatures->load(data.scene, params.imageFolder, regions_type, &progress);
 
@@ -107,12 +107,15 @@ namespace coloc
 		data.mapRegions.reset(mapFeatures.getRegionsType()->EmptyClone());
 		for (const auto & landmark : data.scene.GetLandmarks())
 		{
-				if (landmark.second.obs.at(0).id_feat != UndefinedIndexT)
+			for (const auto & observation : landmark.second.obs)
+			{
+				if (observation.second.id_feat != UndefinedIndexT)
 				{
-					const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(0);
-					viewRegions->CopyRegion(landmark.second.obs.at(0).id_feat, data.mapRegions.get());
+					const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(observation.first);
+					viewRegions->CopyRegion(observation.second.id_feat, data.mapRegions.get());
 					data.mapRegionIdx.push_back(landmark.first);
 				}
+			}
 		}
 		return EXIT_SUCCESS;
 	}
@@ -120,7 +123,7 @@ namespace coloc
 	void Utils::matchMaps(LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures)
 	{
 		matching::DistanceRatioMatch(
-			0.2, matching::BRUTE_FORCE_HAMMING,
+			0.8, matching::CASCADE_HASHING_L2,
 			*data1.mapRegions.get(),
 			*data2.mapRegions.get(),
 			commonFeatures);

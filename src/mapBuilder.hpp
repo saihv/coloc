@@ -91,6 +91,7 @@ namespace coloc
 		initializeTracks(seedPair);
 		initializeScene(640, 480);
 		triangulatePoints(origin, scale);	
+		//resectionCamera(2);
 		saveSceneData(this->scene);
 	}
 	

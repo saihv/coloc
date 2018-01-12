@@ -41,11 +41,25 @@ file(
 file(
   GLOB_RECURSE
   coloc_files
-  src/*.cpp
+  src/coloc.cpp
 )
 
 add_executable(coloc ${coloc_headers} ${coloc_files})
 target_link_libraries(coloc
+  openMVG_system
+  openMVG_image
+  openMVG_features
+  openMVG_multiview
+  openMVG_matching_image_collection
+  openMVG_sfm
+  openMVG_geometry
+  ceres
+  stlplus
+  easyexif
+  vlsift)
+
+add_executable(loctest loctest.cpp)
+target_link_libraries(loctest
   openMVG_system
   openMVG_image
   openMVG_features
