@@ -58,64 +58,6 @@ namespace coloc
 		std::unique_ptr<features::Regions> mapDesc;
 		std::vector<IndexT> mapDescIdx;
 	};
-	
-	bool Localizer::setupMap(LocalizationData& data)
-	{		
-		if (data.scene.GetPoses().empty() || data.scene.GetLandmarks().empty()) {
-			std::cerr << "The input scene has no 3D content." << std::endl;
-			return EXIT_FAILURE;
-		}
-
-		std::string folderName = "C:/Users/saihv/Desktop/test";
-		C_Progress_display progress;
-		std::unique_ptr<Regions> regions_type;
-		regions_type.reset(new features::AKAZE_Float_Regions());
-
-		mapFeatures->load(data.scene, folderName, regions_type, &progress);
-
-		if (initMatchingInterface(data.scene, *mapFeatures.get())) {
-			std::cerr << "Cannot initialize the SfM localizer" << std::endl;
-			return EXIT_FAILURE;
-		}
-		else
-			std::cout << "Initialized SFM localizer with map" << std::endl;
-
-		scenePtr = &data.scene;
-		mapFeatures.reset();
-
-		return EXIT_SUCCESS;
-	}
-
-	bool Localizer::initMatchingInterface(SfM_Data& scene, Regions_Provider& mapFeatures)
-	{
-		if (scene.GetPoses().empty() || scene.GetLandmarks().empty()) {
-			std::cerr << std::endl << "The input SfM_Data file have not 3D content to match with." << std::endl;
-			return EXIT_FAILURE;
-		}
-
-		mapDesc.reset(mapFeatures.getRegionsType()->EmptyClone());
-		for (const auto & landmark : scene.GetLandmarks())
-		{
-			for (const auto & observation : landmark.second.obs)
-			{
-				if (observation.second.id_feat != UndefinedIndexT)
-				{
-					const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(observation.first);
-					viewRegions->CopyRegion(observation.second.id_feat, mapDesc.get());
-					mapDescIdx.push_back(landmark.first);
-				}
-			}
-		}
-		
-		std::cout << "Init retrieval database ... " << std::endl;
-		matchInterface.reset(new matching::Matcher_Regions_Database(matching::CASCADE_HASHING_L2, *mapDesc));
-		std::cout << "Retrieval database initialized with:\n"
-			<< "#landmarks: " << scene.GetLandmarks().size() << "\n"
-			<< "#descriptors: " << mapDesc->RegionCount() << std::endl;
-			
-		return EXIT_SUCCESS;
-	}
-	
 
 	bool Localizer::matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr)
 	{
@@ -125,15 +67,15 @@ namespace coloc
 			return EXIT_FAILURE;
 
 		std::vector<IndMatch> trackedFeatures;
-		if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
+		//if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
 
-		//matching::DistanceRatioMatch(
-		//	0.2, matching::CASCADE_HASHING_L2,
-		//	*data.mapRegions.get(),
-		//	queryRegions,
-		//	trackedFeatures);
+		matching::DistanceRatioMatch(
+			0.8, matching::CASCADE_HASHING_L2,
+			*data.mapRegions.get(),
+			queryRegions,
+			trackedFeatures);
 
-		//if (trackedFeatures.empty())
+		if (trackedFeatures.empty())
 		{
 			std::cout << "Unable to track any features" << std::endl;
 			return EXIT_FAILURE;
@@ -149,9 +91,11 @@ namespace coloc
 		trackData.pt2D.resize(2, trackedFeatures.size());
 		Mat2X pt2D_original(2, trackedFeatures.size());
 
+		scenePtr = &data.scene;
+
 		for (size_t i = 0; i < trackedFeatures.size(); ++i)
 		{
-			trackData.pt3D.col(i) = scenePtr->GetLandmarks().at(mapDescIdx[trackedFeatures[i].i_]).X;
+			trackData.pt3D.col(i) = scenePtr->GetLandmarks().at(data.mapRegionIdx[trackedFeatures[i].i_]).X;
 			trackData.pt2D.col(i) = queryRegions.GetRegionPosition(trackedFeatures[i].j_);
 			pt2D_original.col(i) = trackData.pt2D.col(i);
 
@@ -189,7 +133,16 @@ namespace coloc
 		}
 		else {
 			std::cout << "Localization successful" << std::endl;
-			refine(pose, matching_data);
+			//refine(pose, matching_data);
+			std::shared_ptr<cameras::IntrinsicBase> optional_intrinsic;
+			optional_intrinsic = std::make_shared<cameras::Pinhole_Intrinsic_Radial_K3>(
+				imageGray.Width(), imageGray.Height(),
+				(*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
+			//const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
+			if (this->refine(pose, matching_data))
+			{
+				std::cerr << "Refining pose for image failed." << std::endl;
+			}
 			return EXIT_SUCCESS;
 		}
 

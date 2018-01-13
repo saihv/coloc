@@ -34,6 +34,7 @@
 #include "third_party/ceres/types.h"
 #include "third_party/ceres/local_parameterization.h"
 #include "third_party/ceres/loss_function.h"
+#include "third_party/ceres/covariance.h"
 
 using namespace openMVG;
 using namespace openMVG::cameras;
@@ -51,14 +52,14 @@ namespace coloc
 	private:
 		struct CeresOptions
 		{
-			bool bVerbose_;
-			unsigned int nb_threads_;
-			bool bCeres_summary_;
-			int linear_solver_type_;
-			int preconditioner_type_;
-			int sparse_linear_algebra_library_type_;
-			double parameter_tolerance_;
-			bool bUse_loss_function_;
+			bool bVerbose_ = 1;
+			unsigned int nb_threads_ = 4;
+			bool bCeres_summary_ = 1;
+			int linear_solver_type_ = ceres::SPARSE_SCHUR;
+			int preconditioner_type_ = ceres::JACOBI;
+			int sparse_linear_algebra_library_type_ = ceres::CX_SPARSE;
+			double parameter_tolerance_ = 1e-8;
+			bool bUse_loss_function_ = 1;
 		};
 
 		CeresOptions ceresOptions;
@@ -76,6 +77,12 @@ namespace coloc
 		Hash_Map<IndexT, std::vector<double>> map_intrinsics;
 		Hash_Map<IndexT, std::vector<double>> map_poses;
 
+		std::vector<double *> pose_parameter;
+		ceres::Covariance::Options covOptions;
+		ceres::Covariance covariance(covOptions);
+
+		std::vector<std::pair<const double*, const double*> > covariance_blocks;
+
 		// Setup Poses data & subparametrization
 		for (const auto & pose_it : scene.poses)
 		{
@@ -90,8 +97,11 @@ namespace coloc
 			// angleAxis + translation
 			map_poses[indexPose] = { angleAxis[0], angleAxis[1], angleAxis[2], t(0), t(1), t(2) };
 
-			double * parameter_block = &map_poses.at(indexPose)[0];
+			double * parameter_block = &map_poses[indexPose][0];
+			pose_parameter.push_back(parameter_block);
 			problem.AddParameterBlock(parameter_block, 6);
+			covariance_blocks.push_back(std::make_pair(parameter_block, parameter_block));
+
 			if (options.extrinsics_opt == Extrinsic_Parameter_Type::NONE)
 			{
 				// set the whole parameter block as constant for best performance
@@ -158,16 +168,16 @@ namespace coloc
 				// dimensional residual. Internally, the cost function stores the observed
 				// image location and compares the reprojection against the observation.
 				ceres::CostFunction* cost_function = IntrinsicsToCostFunction(scene.intrinsics.at(view->id_intrinsic).get(),
-																			obs_it.second.x);
+					obs_it.second.x);
 
 				if (cost_function) {
 					if (!map_intrinsics.at(view->id_intrinsic).empty()) {
-						problem.AddResidualBlock(cost_function, p_LossFunction, &map_intrinsics.at(view->id_intrinsic)[0], 
-												&map_poses.at(view->id_pose)[0], structure_landmark_it.second.X.data());
+						problem.AddResidualBlock(cost_function, p_LossFunction, &map_intrinsics.at(view->id_intrinsic)[0],
+							&map_poses.at(view->id_pose)[0], structure_landmark_it.second.X.data());
 					}
 					else {
-						problem.AddResidualBlock(cost_function,	p_LossFunction, &map_poses.at(view->id_pose)[0], 
-												structure_landmark_it.second.X.data());
+						problem.AddResidualBlock(cost_function, p_LossFunction, &map_poses.at(view->id_pose)[0],
+							structure_landmark_it.second.X.data());
 					}
 				}
 				else {
@@ -198,6 +208,19 @@ namespace coloc
 		ceres::Solve(ceres_config_options, &problem, &summary);
 		if (ceresOptions.bCeres_summary_)
 			std::cout << summary.FullReport() << std::endl;
+
+		covariance.Compute(covariance_blocks, &problem);
+
+		std::vector<std::array<double, 6 * 6>> covariance_pose;
+
+		for (auto pose_param : pose_parameter)
+		{
+			std::array<double, 6 * 6> covpose;
+			double cov_pose[36];
+			covariance.GetCovarianceBlock(pose_param, pose_param, cov_pose);
+			std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
+			covariance_pose.push_back(covpose);
+		}
 
 		// If no error, get back refined parameters
 		if (!summary.IsSolutionUsable())

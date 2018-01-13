@@ -47,10 +47,10 @@ int main()
 
 	Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
 
-	reconstructor.reconstructScene(data, origin, 1.0);
+	reconstructor.reconstructScene(data, origin, 15.0);
 
 	data.scene.s_root_path = params.imageFolder;
-	bool mapReady = localizer.setupMap(data);
+	bool mapReady = utils.setupMap(data, params);
 	
 	Pose3 pose;
 	if (!mapReady) {
