@@ -55,7 +55,7 @@ int main()
 
 	Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
 
-	reconstructor.reconstructScene(data, origin, 1.0);
+	reconstructor.reconstructScene(data, origin, 20.0);
 
 	data.scene.s_root_path = params.imageFolder;
 	bool mapReady = utils.setupMap(data, params);
@@ -67,6 +67,8 @@ int main()
 
 	Plotter plotter;
 	plotter.plotScene(data.scene);
+	plotter.plotPoseandCovariance(pose, cov);
+	plotter.drawPlot();
 	getchar();
 	return 0;
 }
