@@ -14,8 +14,8 @@ namespace coloc
 	class FeatureExtractor {
 	public:
 		FeatureExtractor(LocalizationParams& params);
-		void detectFeatures(unsigned int index, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName);
-		void saveFeatureData(uint16_t id, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& name);
+		void detectFeatures(unsigned int index, FeatureMap& regions, std::string& imageName);
+		void saveFeatureData(uint16_t id, FeatureMap& regions, std::string& name);
 		// int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 
 	private:
@@ -28,9 +28,11 @@ namespace coloc
 			image_describer.reset(new features::SIFT_Image_describer(features::SIFT_Image_describer::Params(), true));
 		else if (params.featureDetectorType == "AKAZE")
 			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MSURF), true);
+		else if (params.featureDetectorType == "BINARY")
+			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
 	}
 
-	void FeatureExtractor::detectFeatures(unsigned int index, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& imageName)
+	void FeatureExtractor::detectFeatures(unsigned int index, FeatureMap &regions, std::string &imageName)
 	{
 		image::Image<unsigned char> imageGray;
 
@@ -40,7 +42,7 @@ namespace coloc
 		image_describer->Describe(imageGray, regions[index]);
 	}
 
-	void FeatureExtractor::saveFeatureData(uint16_t id, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, std::string& name)
+	void FeatureExtractor::saveFeatureData(uint16_t id, FeatureMap &regions, std::string &name)
 	{
 		const std::string
 			sFeat = stlplus::create_filespec(stlplus::folder_part(name), stlplus::basename_part(name), "feat"),

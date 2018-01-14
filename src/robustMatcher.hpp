@@ -34,21 +34,20 @@ namespace coloc
 			this->K = &params.K;
 		}
 
-		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair, std::map<IndexT, std::unique_ptr<features::Regions> >&, PairWiseMatches&);
-		void filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, std::map<Pair, RelativePose_Info>& relativePoses);
+		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair, FeatureMap& regions, PairWiseMatches& putativeMatches);
+		void filterMatches(FeatureMap& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, InterPoseMap& relativePoses);
 
 		PairWiseMatches geometricMatches;
 
 	private:
-		std::map<IndexT, std::unique_ptr<features::Regions> > featureRegions;
+		FeatureMap featureRegions;
 		std::pair<size_t, size_t> *imageSize;
-
 		int iterationCount = 256;
 		Mat3 *K;
 	};
 
 	
-	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(Pair current_pair, std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches)
+	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)
 	{
 		const uint32_t I = std::min(current_pair.first, current_pair.second);
 		const uint32_t J = std::max(current_pair.first, current_pair.second);
@@ -85,7 +84,7 @@ namespace coloc
 		return std::make_unique<RelativePose_Info>(relativePose);
 	}
 
-	void RobustMatcher::filterMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, std::map<Pair, RelativePose_Info>& relativePoses)
+	void RobustMatcher::filterMatches(FeatureMap& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, InterPoseMap& relativePoses)
 	{
 		for (const auto matchedPair : putativeMatches) {
 			Pair currentPair = matchedPair.first;

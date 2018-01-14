@@ -58,6 +58,10 @@ using namespace openMVG::sfm;
 
 namespace coloc
 {
+	typedef std::vector<std::array<double, 6 * 6>> Cov6;
+	typedef std::map<IndexT, std::unique_ptr<features::Regions> > FeatureMap;
+	typedef std::map<Pair, RelativePose_Info> InterPoseMap;
+
 	class LocalizationParams {
 	public:
 		std::string imageFolder;

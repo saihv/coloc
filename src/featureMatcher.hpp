@@ -24,21 +24,30 @@ namespace coloc
 
 		Pair_Set handlePairs(int);
 		void computePairMatches(const Pair& pairIdx, std::unique_ptr<features::Regions>& regions1, std::unique_ptr<features::Regions>& regions2, PairWiseMatches& putativeMatches);
-		void computeMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches);
+		void computeMatches(FeatureMap& regions, PairWiseMatches& putativeMatches);
 
 	private:
 		std::unique_ptr<openMVG::features::Regions> regions_type;
 		std::string featFile, descFile;
 		PairWiseMatches putativeMatches;
 		std::map<Pair, unsigned int> overlap;
+		EMatcherType matchingType;
 	};
 
 	FeatureMatcher::FeatureMatcher(LocalizationParams& params) 
 	{
-		if (params.featureDetectorType == "AKAZE")
+		if (params.featureDetectorType == "AKAZE") {
 			regions_type.reset(new openMVG::features::AKAZE_Float_Regions);
-		else if (params.featureDetectorType == "SIFT")
+			matchingType = BRUTE_FORCE_L2;
+		}
+		else if (params.featureDetectorType == "SIFT") {
 			regions_type.reset(new openMVG::features::SIFT_Regions);
+			matchingType = CASCADE_HASHING_L2;
+		}
+		else if (params.featureDetectorType == "BINARY") {
+			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
+			matchingType = BRUTE_FORCE_HAMMING;
+		}
 	}
 
 	Pair_Set FeatureMatcher::handlePairs(int numImages)
@@ -46,7 +55,7 @@ namespace coloc
 		return exhaustivePairs(numImages);
 	}
 
-	void FeatureMatcher::computeMatches(std::map<IndexT, std::unique_ptr<features::Regions> >& regions, PairWiseMatches& putativeMatches)
+	void FeatureMatcher::computeMatches(FeatureMap &regions, PairWiseMatches &putativeMatches)
 	{
 		int numImages = regions.size();
 		Pair_Set pairs = handlePairs(numImages);
@@ -77,7 +86,7 @@ namespace coloc
 		std::vector<IndMatch> vec_PutativeMatches;
 
 		matching::DistanceRatioMatch(
-			0.8, matching::CASCADE_HASHING_L2,
+			0.8, this->matchingType,
 			*regions1.get(),
 			*regions2.get(),
 			vec_PutativeMatches);

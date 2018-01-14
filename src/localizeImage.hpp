@@ -24,10 +24,18 @@ namespace coloc
 	public:
 		Localizer(LocalizationParams& params)
 		{
-			if (params.featureDetectorType == "SIFT")
+			if (params.featureDetectorType == "SIFT") {
 				image_describer.reset(new features::SIFT_Image_describer(features::SIFT_Image_describer::Params(), true));
-			else if (params.featureDetectorType == "AKAZE")
+				matchingType = CASCADE_HASHING_L2;
+			}
+			else if (params.featureDetectorType == "AKAZE") {
 				image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MSURF), true);
+				matchingType = BRUTE_FORCE_L2;
+			}
+			else if (params.featureDetectorType == "BINARY") {
+				image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
+				matchingType = BRUTE_FORCE_HAMMING;
+			}
 
 			this->imageSize = &params.imageSize;
 			this->K = &params.K;
@@ -35,14 +43,13 @@ namespace coloc
 		}
 
 		std::unique_ptr<features::Regions> regionsCurrent;
-		bool localizeImage(std::string& imageName, geometry::Pose3& pose, LocalizationData &data);
+		bool localizeImage(std::string&, Pose3&, LocalizationData&, Cov6&);
 		bool matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr);
-		bool refine(Pose3& pose, Image_Localizer_Match_Data& matchData);
-		bool setupMap(LocalizationData& data);
-		bool initMatchingInterface(SfM_Data& scene, Regions_Provider& mapFeatures);
+		bool refine(Pose3&, Image_Localizer_Match_Data&, Cov6&);
 		
 	private:
 		std::unique_ptr<features::Image_describer> image_describer;
+		EMatcherType matchingType;
 		std::pair <size_t, size_t> *imageSize;
 		Mat3 *K;
 		std::string *rootFolder;
@@ -70,7 +77,7 @@ namespace coloc
 		//if (!this->matchInterface->Match(0.8, queryRegions, trackedFeatures))
 
 		matching::DistanceRatioMatch(
-			0.8, matching::CASCADE_HASHING_L2,
+			0.8, matchingType,
 			*data.mapRegions.get(),
 			queryRegions,
 			trackedFeatures);
@@ -112,7 +119,7 @@ namespace coloc
 		return localizationStatus;
 	}
 	
-	bool Localizer::localizeImage(std::string& imageName, geometry::Pose3& pose, LocalizationData &data)
+	bool Localizer::localizeImage(std::string& imageName, Pose3& pose, LocalizationData &data, Cov6 &covariance)
 	{
 		using namespace openMVG::features;
 
@@ -139,7 +146,7 @@ namespace coloc
 				imageGray.Width(), imageGray.Height(),
 				(*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
 			//const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
-			if (this->refine(pose, matching_data))
+			if (!this->refine(pose, matching_data, covariance))
 			{
 				std::cerr << "Refining pose for image failed." << std::endl;
 			}
@@ -148,7 +155,7 @@ namespace coloc
 
 	}
 
-	bool Localizer::refine(Pose3& pose, Image_Localizer_Match_Data& matchData)
+	bool Localizer::refine(Pose3 &pose, Image_Localizer_Match_Data& matchData, Cov6 &poseCovariance)
 	{
 		SfM_Data scene;
 		scene.views.insert({ 0, std::make_shared<View>("",0, 0, 0) });
@@ -172,7 +179,7 @@ namespace coloc
 		PoseRefiner refiner;
 		const bool b_BA_Status = refiner.refinePose(
 			scene,
-			ba_refine_options);
+			ba_refine_options, poseCovariance);
 		if (b_BA_Status)
 		{
 			pose = scene.poses[0];

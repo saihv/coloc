@@ -22,6 +22,7 @@
 #include "openMVG/multiview/triangulation.hpp"
 
 #include "localizationData.hpp"
+#include "poseRefiner.hpp"
 
 using namespace openMVG;
 using namespace openMVG::matching;
@@ -49,7 +50,7 @@ namespace coloc
 		void triangulatePoints(Pose3&, float&);
 		void constructProjectionsTriangulation(Pose3&, Pose3&, Mat34& P1, Mat34& P2);
 		bool resectionCamera(unsigned int);
-		bool saveSceneData(SfM_Data* scene);
+		bool saveSceneData(SfM_Data* scene, std::string& fileName);
 		Pose3 relativePoseToAbsolute(Pose3&, Pose3&);
 
 		// Internal variables
@@ -61,6 +62,7 @@ namespace coloc
 		std::pair <size_t, size_t> *imageSize;
 		Mat3 *K;
 		std::string *currentFolder;
+		PoseRefiner refiner;
 
 		// Local pointers to external localization data
 
@@ -90,9 +92,15 @@ namespace coloc
 
 		initializeTracks(seedPair);
 		initializeScene(640, 480);
-		triangulatePoints(origin, scale);	
+		triangulatePoints(origin, scale);
+		const Optimize_Options ba_refine_options
+		(cameras::Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::ADJUST_ALL);
+		std::string initialMap = "initial.ply";
+		std::string refinedMap = "refined.ply";
+		saveSceneData(this->scene, initialMap);
+		refiner.refinePose(*scene, ba_refine_options);
 		//resectionCamera(2);
-		saveSceneData(this->scene);
+		saveSceneData(this->scene, refinedMap);
 	}
 	
 	void Reconstructor::initializeTracks(Pair& viewPair)
@@ -397,9 +405,9 @@ namespace coloc
 		}
 	}
 
-	bool Reconstructor::saveSceneData(SfM_Data* scene)
+	bool Reconstructor::saveSceneData(SfM_Data* scene, std::string& fileName)
 	{
-		if (openMVG::sfm::Save(*scene, stlplus::create_filespec(*currentFolder, "map.ply"), ESfM_Data(ALL)))
+		if (openMVG::sfm::Save(*scene, stlplus::create_filespec(*currentFolder, fileName), ESfM_Data(ALL)))
 			return 1;
 		else
 			return 0;

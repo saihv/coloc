@@ -71,6 +71,7 @@ namespace coloc
 
 	private:
 		std::shared_ptr<Regions_Provider> mapFeatures = std::make_shared<Regions_Provider>();
+		EMatcherType matchingType;
 	};
 
 	bool Utils::setupMap(LocalizationData &data, LocalizationParams &params)
@@ -82,7 +83,19 @@ namespace coloc
 
 		C_Progress_display progress;
 		std::unique_ptr<Regions> regions_type;
-		regions_type.reset(new features::AKAZE_Float_Regions());
+
+		if (params.featureDetectorType == "AKAZE") {
+			regions_type.reset(new openMVG::features::AKAZE_Float_Regions);
+			matchingType = BRUTE_FORCE_L2;
+		}
+		else if (params.featureDetectorType == "SIFT") {
+			regions_type.reset(new openMVG::features::SIFT_Regions);
+			matchingType = CASCADE_HASHING_L2;
+		}
+		else if (params.featureDetectorType == "BINARY") {
+			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
+			matchingType = BRUTE_FORCE_HAMMING;
+		}
 
 		mapFeatures->load(data.scene, params.imageFolder, regions_type, &progress);
 
@@ -120,11 +133,10 @@ namespace coloc
 	void Utils::matchMaps(LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures)
 	{
 		matching::DistanceRatioMatch(
-			0.8, matching::CASCADE_HASHING_L2,
+			0.999, matchingType,
 			*data1.mapRegions.get(),
 			*data2.mapRegions.get(),
 			commonFeatures);
-
 	}
 
 	bool Utils::computeScaleDifference(LocalizationData &data1, LocalizationData &data2, float &scaleDiff)
@@ -166,9 +178,6 @@ namespace coloc
 
 			scale += std::max(dist1, dist2) / std::min(dist1, dist2);
 		}
-
 		scaleDiff = scale / (commonFeatures.size() - 1);
 	}
-
-
 }

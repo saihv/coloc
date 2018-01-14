@@ -8,6 +8,13 @@
 #include "localizeImage.hpp"
 
 #include <filesystem>
+
+#if !defined _DEBUG
+	#include "matplotlibcpp.h"
+	namespace plt = matplotlibcpp;
+#endif
+
+using namespace coloc;
 namespace fs = std::experimental::filesystem;
 
 int main()
@@ -15,10 +22,10 @@ int main()
 	coloc::LocalizationData data, data2;
 	coloc::LocalizationParams params;
 
-	params.featureDetectorType = "AKAZE";
+	params.featureDetectorType = "BINARY";
 	params.imageSize = std::make_pair(640, 480);
 	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
-	params.imageFolder = "C:/Users/saihv/Desktop/testnewer/";
+	params.imageFolder = "C:/Users/saihv/Desktop/testnew/";
 
 	coloc::FeatureExtractor detector(params);
 	coloc::FeatureMatcher matcher(params);
@@ -31,9 +38,9 @@ int main()
 
 	std::string filename[3];	
 
-	filename[0] = "C:/Users/saihv/Desktop/testnewer/img__Quad0_0000.png";
-	filename[1] = "C:/Users/saihv/Desktop/testnewer/img__Quad1_0002.png";
-	filename[2] = "C:/Users/saihv/Desktop/testnewer/img__Quad1_0250.png";
+	filename[0] = "C:/Users/saihv/Desktop/testnew/img__Quad0_0000.png";
+	filename[1] = "C:/Users/saihv/Desktop/testnew/img__Quad1_0000.png";
+	filename[2] = "C:/Users/saihv/Desktop/testnew/img__Quad2_0000.png";
 
 	for (unsigned int i = 0; i < numDrones; ++i) {
 		detector.detectFeatures(i, data.regions, filename[i]);
@@ -47,42 +54,17 @@ int main()
 
 	Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
 
-	reconstructor.reconstructScene(data, origin, 15.0);
+	reconstructor.reconstructScene(data, origin, 1.0);
 
 	data.scene.s_root_path = params.imageFolder;
 	bool mapReady = utils.setupMap(data, params);
 	
 	Pose3 pose;
-	if (!mapReady) {
-		
-		localizer.localizeImage(filename[2], pose, data);
-	}
-	
-	for (unsigned int i = 0; i < numDrones; ++i) {
-		detector.detectFeatures(i, data2.regions, filename[i]);
-		detector.saveFeatureData(i, data2.regions, filename[i]);
+	Cov6 cov;
+	if (!mapReady)		
+		localizer.localizeImage(filename[2], pose, data, cov);
 
-		data2.scene.views[i].reset(new View(filename[i], i, 0, i, params.imageSize.first, params.imageSize.second));
-	}
-
-	matcher.computeMatches(data2.regions, data2.putativeMatches);
-	robustMatcher.filterMatches(data2.regions, data2.putativeMatches, data2.geometricMatches, data2.relativePoses);
-
-	coloc::Reconstructor reconstructor2(params);
-	reconstructor2.reconstructScene(data2, origin, 1.0);
-
-	coloc::Utils utils2;
-
-	data2.scene.s_root_path = params.imageFolder;
-	mapReady = utils2.setupMap(data2, params);
-
-	float scaleDiff;
-	utils.computeScaleDifference(data, data2, scaleDiff);
-
-	std::cout << "Difference between scale factors is " << scaleDiff << std::endl;
-
-	
-
+	getchar();
 	return 0;
 }
 

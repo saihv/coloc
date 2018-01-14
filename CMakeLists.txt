@@ -17,10 +17,12 @@ else()
 endif()
 
 set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install/share/openMVG/cmake")
+set(PYTHON_LIBRARY "C:/Python27/libs/python27.lib")
+set(PYTHON_INCLUDE_DIR "C:/Python27/include;C:/Python27/Lib/site-packages/numpy/core/include")
 
-find_package (OpenMVG REQUIRED)
-find_package( Threads REQUIRED)
-
+find_package(OpenMVG REQUIRED)
+find_package(Threads REQUIRED)
+find_package(PythonLibs 2.7)
 find_package(OpenMP)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -31,6 +33,7 @@ include_directories(
     ${OPENMVG_INCLUDE_DIRS}
     ${Eigen_INCLUDE_DIRS} 
     ${CERES_INCLUDE_DIRS}
+    ${PYTHON_INCLUDE_DIRS}    
 )
 
 file(
@@ -56,4 +59,9 @@ target_link_libraries(coloc
   ceres
   stlplus
   easyexif
-  vlsift)
+  vlsift
+  ${PYTHON_LIBRARIES})
+
+add_executable(plottest src/plottest.cpp)
+target_link_libraries(plottest
+  ${PYTHON_LIBRARIES})
