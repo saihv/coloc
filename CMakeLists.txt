@@ -16,9 +16,14 @@ else()
         message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
 endif()
 
-set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install/share/openMVG/cmake")
-set(PYTHON_LIBRARY "C:/Python27/libs/python27.lib")
-set(PYTHON_INCLUDE_DIR "C:/Python27/include;C:/Python27/Lib/site-packages/numpy/core/include")
+if(WIN32)
+    set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install/share/openMVG/cmake")
+    set(PYTHON_LIBRARY "C:/Python27/libs/python27.lib")
+    set(PYTHON_INCLUDE_DIR "C:/Python27/include;C:/Python27/Lib/site-packages/numpy/core/include")
+endif(WIN32)
+
+if(UNIX)
+endif(UNIX)
 
 find_package(OpenMVG REQUIRED)
 find_package(Threads REQUIRED)
@@ -60,8 +65,4 @@ target_link_libraries(coloc
   stlplus
   easyexif
   vlsift
-  ${PYTHON_LIBRARIES})
-
-add_executable(plottest src/plottest.cpp)
-target_link_libraries(plottest
   ${PYTHON_LIBRARIES})
