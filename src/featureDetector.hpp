@@ -36,10 +36,13 @@ namespace coloc
 	{
 		image::Image<unsigned char> imageGray;
 
+		std::cout << "Features extractignge for image" << imageName << std::endl;
 		if (!ReadImage(imageName.c_str(), &imageGray)) {
 			std::cout << "Unable to read image from the given path." << std::endl;
 		}
+		std::cout << "Features readed" << imageName << std::endl;
 		image_describer->Describe(imageGray, regions[index]);
+		std::cout << "Features extracted for image" << imageName << std::endl;
 	}
 
 	void FeatureExtractor::saveFeatureData(uint16_t id, FeatureMap &regions, std::string &name)

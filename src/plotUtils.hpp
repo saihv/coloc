@@ -46,6 +46,7 @@ namespace coloc
 		command += "s=20, c='" + color + "')";
 
 		PyRun_SimpleString(command.c_str());
+		return true;
 	}
 
 	bool Plotter::plotMap(Scene& scene)
@@ -84,6 +85,8 @@ namespace coloc
 		command += "],c='" + mapColor + "')";
 
 		PyRun_SimpleString(command.c_str());
+
+		return true;
 	}
 
 	bool Plotter::plotPoseandCovariance(Pose3& pose, Cov6& cov)

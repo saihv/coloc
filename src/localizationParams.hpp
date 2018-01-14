@@ -50,6 +50,9 @@
 #include <memory>
 #include <string>
 
+#define Success 1
+#define Failure 0
+
 using namespace openMVG;
 using namespace openMVG::features;
 using namespace openMVG::matching;
