@@ -6,6 +6,7 @@
 #include "robustMatcher.hpp"
 #include "mapBuilder.hpp"
 #include "localizeImage.hpp"
+#include "plotUtils.hpp"
 
 #include <filesystem>
 
@@ -64,6 +65,8 @@ int main()
 	if (!mapReady)		
 		localizer.localizeImage(filename[2], pose, data, cov);
 
+	Plotter plotter;
+	plotter.plotScene(data.scene);
 	getchar();
 	return 0;
 }

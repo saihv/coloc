@@ -50,6 +50,8 @@
 #include <memory>
 #include <string>
 
+#include "localizationParams.hpp"
+
 using namespace openMVG;
 using namespace openMVG::features;
 using namespace openMVG::matching;
@@ -60,11 +62,11 @@ namespace coloc
 {
 	class LocalizationData {
 	public:
-		std::map<IndexT, std::unique_ptr<features::Regions> > regions;
+		FeatureMap regions;
 		PairWiseMatches putativeMatches, geometricMatches;
-		std::map<Pair, RelativePose_Info> relativePoses;
+		InterPoseMap relativePoses;
 		std::map<Pair, double> overlap;
-		SfM_Data scene;
+		Scene scene;
 
 		std::unique_ptr<features::Regions> mapRegions;
 		std::vector<IndexT> mapRegionIdx;

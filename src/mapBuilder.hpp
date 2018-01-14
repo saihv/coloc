@@ -50,7 +50,7 @@ namespace coloc
 		void triangulatePoints(Pose3&, float&);
 		void constructProjectionsTriangulation(Pose3&, Pose3&, Mat34& P1, Mat34& P2);
 		bool resectionCamera(unsigned int);
-		bool saveSceneData(SfM_Data* scene, std::string& fileName);
+		bool saveSceneData(Scene* scene, std::string& fileName);
 		Pose3 relativePoseToAbsolute(Pose3&, Pose3&);
 
 		// Internal variables
@@ -69,7 +69,7 @@ namespace coloc
 		std::map<IndexT, std::unique_ptr<features::Regions> > * regionsRCT;
 		PairWiseMatches* matchesRCT;
 		std::map<Pair, RelativePose_Info > * relativePosesRCT;
-		SfM_Data* scene;
+		Scene* scene;
 	};
 	
 	void Reconstructor::reconstructScene(LocalizationData& data, Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero()), float scale = 1.0)
@@ -405,7 +405,7 @@ namespace coloc
 		}
 	}
 
-	bool Reconstructor::saveSceneData(SfM_Data* scene, std::string& fileName)
+	bool Reconstructor::saveSceneData(Scene* scene, std::string& fileName)
 	{
 		if (openMVG::sfm::Save(*scene, stlplus::create_filespec(*currentFolder, fileName), ESfM_Data(ALL)))
 			return 1;

@@ -65,7 +65,7 @@ namespace coloc
 	public:
 		void matchMaps(LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures);
 		bool computeScaleDifference(LocalizationData &data1, LocalizationData &data2, float &scaleDiff);
-		bool matchSceneWithMap(SfM_Data scene);
+		bool matchSceneWithMap(Scene scene);
 		bool setupMap(LocalizationData&, LocalizationParams&);
 		bool initMapMatchingInterface(LocalizationData &data, Regions_Provider &mapFeatures);
 
@@ -113,7 +113,7 @@ namespace coloc
 	bool Utils::initMapMatchingInterface(LocalizationData &data, Regions_Provider& mapFeatures)
 	{
 		if (data.scene.GetPoses().empty() || data.scene.GetLandmarks().empty()) {
-			std::cerr << std::endl << "The input SfM_Data file have not 3D content to match with." << std::endl;
+			std::cerr << std::endl << "The input Scene file have not 3D content to match with." << std::endl;
 			return EXIT_FAILURE;
 		}
 
