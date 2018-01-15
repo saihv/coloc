@@ -9,7 +9,7 @@
 #include "mapBuilder.hpp"
 #include "localizeImage.hpp"
 #include "plotUtils.hpp"
-
+#include "logUtils.hpp"
 #include <filesystem>
 
 namespace coloc
@@ -33,14 +33,20 @@ namespace coloc
 		LocalizationParams params;
 		int numDrones, imageNumber;
 
+		std::string poseFile;
+		std::string mapFile;
+
 	private:
 		FeatureExtractor detector{ params };
 		FeatureMatcher matcher{ params };
 		RobustMatcher robustMatcher{ params };
 		Reconstructor reconstructor{ params };
 		Localizer localizer{ params };
+		Logger logger{};
 		Utils utils;
 		bool mapReady;
+
+		
 	};
 
 	void ColoC::updateMap(float scale = 1.0)
@@ -65,6 +71,7 @@ namespace coloc
 		std::cout << "Updating map" << std::endl;
 		reconstructor.reconstructScene(data, origin, scale, true);
 
+		logger.logMaptoPLY(data.scene, mapFile);
 		data.scene.s_root_path = params.imageFolder;
 		mapReady = utils.setupMap(data, params);
 	}
@@ -72,9 +79,16 @@ namespace coloc
 	void ColoC::intraPoseEstimator(int& droneId, Pose3& pose, Cov6& cov)
 	{
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
-		std::string fileName = params.imageFolder + "img__Quad" + std::to_string(2) + "_" + number + ".png";
+		std::string fileName = params.imageFolder + "img__Quad" + std::to_string(droneId) + "_" + number + ".png";
+		bool locStatus;
+
 		if (!mapReady)
-			localizer.localizeImage(fileName, pose, data, cov);
+			locStatus = localizer.localizeImage(fileName, pose, data, cov);
+
+		if (locStatus) {
+			logger.logPoseCovtoFile(droneId, droneId, pose, cov, poseFile);
+			logger.logPosetoPLY(pose, mapFile);
+		}
 	}
 
 	void ColoC::interPoseEstimator(int sourceId, int destId, Pose3& origin, Pose3& pose, Cov6& cov)
@@ -125,7 +139,7 @@ LocalizationParams initParams()
 	params.featureDetectorType = "BINARY";
 	params.imageSize = std::make_pair(640, 480);
 	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
-	params.imageFolder = "C:/Users/saihv/Desktop/testnew/";
+	params.imageFolder = "C:/Users/saihv/Desktop/testnewer/";
 	return params;
 }
 
@@ -137,15 +151,25 @@ int main()
 
 	ColoC coloc(numDrones, startNum, params);
 	coloc.updateMap(10.0);
+	coloc.poseFile = params.imageFolder + "poses.txt";
+	coloc.mapFile = params.imageFolder + "output.ply";
 
 	Pose3 poseIntra, poseInter;
 	Cov6 covIntra, covInter;
 
-	int droneId = 2;
-	coloc.intraPoseEstimator(droneId, poseIntra, covIntra);
-	coloc.interPoseEstimator(0, 2, coloc.data.scene.poses.at(0), poseInter, covInter);
 	Plotter plotter;
 	plotter.plotScene(coloc.data.scene);
+
+	int droneId = 1;
+	coloc.imageNumber = 250;
+	for (int i = 250; i < 481; ++i) {
+		coloc.intraPoseEstimator(droneId, poseIntra, covIntra);
+		plotter.plotPose(poseIntra);
+		coloc.imageNumber++;
+	}
+
+	coloc.interPoseEstimator(0, 2, coloc.data.scene.poses.at(0), poseInter, covInter);
+	
 	plotter.plotPoseandCovariance(poseIntra, covIntra);
 	plotter.plotPoseandCovariance(poseInter, covInter);
 	plotter.drawPlot();

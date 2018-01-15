@@ -196,10 +196,17 @@ namespace coloc
 
 		if (covariance_blocks.size() != 0) {
 			covariance.Compute(covariance_blocks, &problem);
-			for (auto param : poseParameter) {
+			if (poseParameter.size() > 1) {
 				std::array<double, 6 * 6> covpose;
 				double cov_pose[6 * 6];
-				covariance.GetCovarianceBlock(param, param, cov_pose);
+				covariance.GetCovarianceBlock(poseParameter[1], poseParameter[1], cov_pose);
+				std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
+				poseCovariance.push_back(covpose);
+			}
+			else {
+				std::array<double, 6 * 6> covpose;
+				double cov_pose[6 * 6];
+				covariance.GetCovarianceBlock(poseParameter[0], poseParameter[0], cov_pose);
 				std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
 				poseCovariance.push_back(covpose);
 			}

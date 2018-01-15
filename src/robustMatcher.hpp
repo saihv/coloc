@@ -44,7 +44,7 @@ namespace coloc
 
 		FeatureMap featureRegions;
 		std::pair<size_t, size_t> *imageSize;
-		int iterationCount = 256;
+		int iterationCount = 4096;
 		Mat3 *K;
 	};
 

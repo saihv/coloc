@@ -14,7 +14,7 @@ namespace coloc
 	class FeatureExtractor {
 	public:
 		FeatureExtractor(LocalizationParams& params);
-		void detectFeatures(unsigned int index, FeatureMap& regions, std::string& imageName);
+		bool detectFeatures(unsigned int index, FeatureMap& regions, std::string& imageName);
 		void saveFeatureData(uint16_t id, FeatureMap& regions, std::string& name);
 		// int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 
@@ -32,17 +32,18 @@ namespace coloc
 			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
 	}
 
-	void FeatureExtractor::detectFeatures(unsigned int index, FeatureMap &regions, std::string &imageName)
+	bool FeatureExtractor::detectFeatures(unsigned int index, FeatureMap &regions, std::string &imageName)
 	{
 		image::Image<unsigned char> imageGray;
 
-		std::cout << "Features extractignge for image" << imageName << std::endl;
 		if (!ReadImage(imageName.c_str(), &imageGray)) {
 			std::cout << "Unable to read image from the given path." << std::endl;
 		}
-		std::cout << "Features readed" << imageName << std::endl;
-		image_describer->Describe(imageGray, regions[index]);
-		std::cout << "Features extracted for image" << imageName << std::endl;
+		if (!image_describer->Describe(imageGray, regions[index])) {
+			std::cout << "Feature detection failed.";
+			return Failure;
+		}
+		return Success;
 	}
 
 	void FeatureExtractor::saveFeatureData(uint16_t id, FeatureMap &regions, std::string &name)

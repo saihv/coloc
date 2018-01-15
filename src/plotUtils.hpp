@@ -22,6 +22,7 @@ namespace coloc
 		}
 		bool plotScene(Scene& scene);
 		bool plotPoseandCovariance(Pose3& pose, Cov6& cov);
+		bool plotPose(Pose3& pose);
 		void drawPlot();
 
 	private:
@@ -57,7 +58,7 @@ namespace coloc
 		for (auto landmark : map) {
 			Vec3 loc = landmark.second.X;
 
-			std::cout << "Plotting map point at " << loc[0] << "," << loc[1] << "," << loc[2] << std::endl;
+			// std::cout << "Plotting map point at " << loc[0] << "," << loc[1] << "," << loc[2] << std::endl;
 			x.push_back(loc[0]);
 			y.push_back(loc[1]);
 			z.push_back(loc[2]);
@@ -85,8 +86,15 @@ namespace coloc
 		command += "],c='" + mapColor + "')";
 
 		PyRun_SimpleString(command.c_str());
+		// std::cout << "Finished plotting map" << std::endl;
+		return Success;
+	}
 
-		return true;
+	bool Plotter::plotPose(Pose3& pose)
+	{
+		Vec3 position = pose.translation();
+		plotLocation(position, locPoseColor);
+		return Success;
 	}
 
 	bool Plotter::plotPoseandCovariance(Pose3& pose, Cov6& cov)
@@ -116,6 +124,8 @@ namespace coloc
 		PyRun_SimpleString("axes.plot_surface(x, y, z,  rstride=4, cstride=4, color=None, alpha=0.2)");
 
 		plotLocation(position, locPoseColor);
+
+		// std::cout << "Plotted pose and covariance" << std::endl;
 		return true;
 	}
 
@@ -128,7 +138,7 @@ namespace coloc
 			Vec3 t = currentPose.translation();
 
 			plotLocation(t, seedPoseColor);
-			std::cout << "Plotting seed pose at " << t[0] << "," << t[1] << "," << t[2] << std::endl;
+			// std::cout << "Plotting seed pose at " << t[0] << "," << t[1] << "," << t[2] << std::endl;
 		}
 
 		plotMap(scene);
