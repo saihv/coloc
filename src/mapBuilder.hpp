@@ -40,7 +40,7 @@ namespace coloc
 			this->currentFolder = &params.imageFolder;
 		}
 
-		void reconstructScene(LocalizationData& data, Pose3, float);
+		void reconstructScene(LocalizationData& data, Pose3, float, bool);
 
 	private:
 		// Internal methods
@@ -72,7 +72,7 @@ namespace coloc
 		Scene* scene;
 	};
 	
-	void Reconstructor::reconstructScene(LocalizationData& data, Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero()), float scale = 1.0)
+	void Reconstructor::reconstructScene(LocalizationData& data, Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero()), float scale = 1.0, bool Adjust = false)
 	{
 		this->regionsRCT = &data.regions;
 		this->matchesRCT = &data.geometricMatches;
@@ -98,7 +98,8 @@ namespace coloc
 		std::string initialMap = "initial.ply";
 		std::string refinedMap = "refined.ply";
 		saveSceneData(this->scene, initialMap);
-		refiner.refinePose(*scene, ba_refine_options);
+		if(Adjust)
+			refiner.refinePose(*scene, ba_refine_options);
 		//resectionCamera(2);
 		saveSceneData(this->scene, refinedMap);
 	}
@@ -139,11 +140,7 @@ namespace coloc
 
 		Landmarks & landmarks = scene->structure;
 
-		for (openMVG::tracks::STLMAPTracks::const_iterator
-			iterT = mapTracksCommon.begin();
-			iterT != mapTracksCommon.end();
-			++iterT)
-		{
+		for (openMVG::tracks::STLMAPTracks::const_iterator iterT = mapTracksCommon.begin(); iterT != mapTracksCommon.end();	++iterT) {
 			// Get corresponding points
 			tracks::submapTrack::const_iterator iter = iterT->second.begin();
 			const uint32_t i = iter->second;
@@ -208,13 +205,8 @@ namespace coloc
 		const PointFeatures resectionFeats = regionsRCT->at(id)->GetRegionsPositions();
 
 		if (resectionTrackId.empty()) {
-			// No match. The image has no connection with already reconstructed points.
-			std::cout << std::endl
-				<< "-------------------------------" << "\n"
-				<< "-- Resection of camera index: " << "\n"
-				<< "-- Resection status: " << "FAILED" << "\n"
-				<< "-------------------------------" << std::endl;
-			return false;
+			std::cout << "Resection of view " << id << " failed." << std::endl;
+			return Failure;
 		}
 
 		std::vector<uint32_t> resectionFeatId;
@@ -238,50 +230,26 @@ namespace coloc
 			resectionData.pt3D.col(ptCurr) = scene->GetLandmarks().at(*iterTrackId).X;
 			resectionData.pt2D.col(ptCurr) = pt2DOriginal.col(ptCurr) = resectionFeats[*iterfeatId].coords().cast<double>();
 			// Handle image distortion if intrinsic is known (to ease the resection)
-			if (intrinsicCurr && intrinsicCurr->have_disto())
-			{
+			if (intrinsicCurr && intrinsicCurr->have_disto()) {
 				resectionData.pt2D.col(ptCurr) = intrinsicCurr->get_ud_pixel(resectionData.pt2D.col(ptCurr));
 			}
 		}
 
-		// C. Do the resectioning: compute the camera pose
-		std::cout << std::endl
-			<< "-------------------------------" << std::endl
-			<< "-- Robust Resection of view: " << std::endl;
-
 		geometry::Pose3 pose;
-		const bool bResection = sfm::SfM_Localizer::Localize
-		(
-			resection::SolverType::P3P_KE_CVPR17,
-			{ viewCurrent->ui_width, viewCurrent->ui_height },
-			intrinsicCurr.get(),
-			resectionData,
-			pose
-		);
-		resectionData.pt2D = std::move(pt2DOriginal); // restore original image domain points
+		const bool bResection = sfm::SfM_Localizer::Localize(resection::SolverType::P3P_KE_CVPR17, { viewCurrent->ui_width, viewCurrent->ui_height },
+								intrinsicCurr.get(), resectionData, pose);
+		resectionData.pt2D = std::move(pt2DOriginal); 
 
-
-		std::cout << std::endl
-			<< "-------------------------------" << "<br>"
-			<< "-- Robust Resection of camera index: <" << "> image: "
-			<< viewCurrent->s_Img_path << "<br>"
-			<< "-- Threshold: " << resectionData.error_max << "<br>"
-			<< "-- Resection status: " << (bResection ? "OK" : "FAILED") << "<br>"
-			<< "-- Nb points used for Resection: " << resectionFeatId.size() << "<br>"
-			<< "-- Nb points validated by robust estimation: " << resectionData.vec_inliers.size() << "<br>"
-			<< "-- % points validated: "
-			<< resectionData.vec_inliers.size() / static_cast<float>(resectionFeatId.size()) << "<br>"
-			<< "-------------------------------" << "<br>";
-
+		std::cout << "Robust Resection of view " << id << " :" << std::endl
+			<< "Threshold: " << resectionData.error_max << std::endl
+			<< "Resection status: " << (bResection ? "Success" : "Failure") << std::endl
+			<< "Feature points tracked: " << resectionFeatId.size() << std::endl
+			<< "Feature points validated: " << resectionData.vec_inliers.size() << std::endl;
 
 		scene->poses[viewCurrent->id_pose] = pose;
 
-		// Since the view have not yet an intrinsic group before, create a new one
 		IndexT new_intrinsic_id = 0;
-		if (!scene->GetIntrinsics().empty())
-		{
-			// Since some intrinsic Id already exists,
-			//  we have to create a new unique identifier following the existing one
+		if (!scene->GetIntrinsics().empty()) {
 			std::set<IndexT> existing_intrinsicId;
 			std::transform(scene->GetIntrinsics().begin(), scene->GetIntrinsics().end(),
 				std::inserter(existing_intrinsicId, existing_intrinsicId.begin()),
@@ -291,125 +259,100 @@ namespace coloc
 		scene->views.at(id)->id_intrinsic = new_intrinsic_id;
 		scene->intrinsics[new_intrinsic_id] = intrinsicCurr;
 
-
-		// F. List tracks that share content with this view and add observations and new 3D track if required.
-		//    - If the track already exists (look if the new view tracks observation are valid)
-		//    - If the track does not exists, try robust triangulation & add the new valid view track observation
 		{
-			// Get information of new view
-			const IndexT I = id;
-			const View * viewCurrent = scene->GetViews().at(I).get();
-			const cameras::IntrinsicBase * camCurrent = scene->GetIntrinsics().at(viewCurrent->id_intrinsic).get();
-			const Pose3 pose_I = scene->GetPoseOrDie(viewCurrent);
+		const IndexT I = id;
+		const View * viewCurrent = scene->GetViews().at(I).get();
+		const cameras::IntrinsicBase * camCurrent = scene->GetIntrinsics().at(viewCurrent->id_intrinsic).get();
+		const Pose3 pose_I = scene->GetPoseOrDie(viewCurrent);
 
-			// Vector of all already reconstructed views
-			const std::set<IndexT> validViews = Get_Valid_Views(*scene);
+		
+		const std::set<IndexT> validViews = Get_Valid_Views(*scene);
 
-			// Go through each track and look if we must add new view observations or new 3D points
-			for (const std::pair< uint32_t, tracks::submapTrack >& trackIt : newCommonTracks)
-			{
-				const uint32_t trackId = trackIt.first;
-				const tracks::submapTrack & track = trackIt.second;
-				// List the potential view observations of the track
-				const tracks::submapTrack & trackViews = mapTracks[trackId];
+		// Go through each track and look if we must add new view observations or new 3D points
+		for (const std::pair< uint32_t, tracks::submapTrack >& trackIt : newCommonTracks) {
+			const uint32_t trackId = trackIt.first;
+			const tracks::submapTrack & track = trackIt.second;
+			// List the potential view observations of the track
+			const tracks::submapTrack & trackViews = mapTracks[trackId];
 
-				// List to save the new view observations that must be added to the track
-				std::set<IndexT> newTracks;
-				// If the track was already reconstructed
-				if (scene->structure.count(trackId) != 0)
-				{
-					// Since the 3D point was triangulated before we add the new the Inth view observation
-					newTracks.insert(I);
-				}
-				else
-				{
-					// Go through the views that observe this track & look if a successful triangulation can be done
-					for (const std::pair< IndexT, IndexT >& trackViewIt : trackViews)
-					{
-						const IndexT & J = trackViewIt.first;
-						// If view is valid try triangulation
-						if (J != I && validViews.count(J) != 0)
-						{
-							// If successfuly triangulated add the observation from J view
-							if (scene->structure.count(trackId) != 0)
-							{
+			// List to save the new view observations that must be added to the track
+			std::set<IndexT> newTracks;
+			// If the track was already reconstructed
+			if (scene->structure.count(trackId) != 0) {
+				// Since the 3D point was triangulated before we add the new the Inth view observation
+				newTracks.insert(I);
+			}
+			else {
+				// Go through the views that observe this track & look if a successful triangulation can be done
+				for (const std::pair< IndexT, IndexT >& trackViewIt : trackViews) {
+					const IndexT & J = trackViewIt.first;
+					// If view is valid try triangulation
+					if (J != I && validViews.count(J) != 0) {
+						// If successfuly triangulated add the observation from J view
+						if (scene->structure.count(trackId) != 0)
+							newTracks.insert(J);
+						else {
+							const View * view_J = scene->GetViews().at(J).get();
+							const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
+							const Pose3 pose_J = scene->GetPoseOrDie(view_J);
+							const Vec2 xJ = regionsRCT->at(J)->GetRegionsPositions()[trackViews.at(J)].coords().cast<double>();
+
+							// Position of the point in view I
+							const Vec2 xI = regionsRCT->at(I)->GetRegionsPositions()[track.at(I)].coords().cast<double>();
+
+							// Try to triangulate a 3D point from J view
+							// A new 3D point must be added
+							// Triangulate it
+							const Vec2 xI_ud = camCurrent->get_ud_pixel(xI);
+							const Vec2 xJ_ud = cam_J->get_ud_pixel(xJ);
+							const Mat34 P_I = camCurrent->get_projective_equivalent(pose_I);
+							const Mat34 P_J = cam_J->get_projective_equivalent(pose_J);
+							Vec3 X = Vec3::Zero();
+							TriangulateDLT(P_I, xI_ud.homogeneous(), P_J, xJ_ud.homogeneous(), &X);
+							// Check triangulation result
+							const double angle = AngleBetweenRay(pose_I, camCurrent, pose_J, cam_J, xI, xJ);
+							const Vec2 residual_I = camCurrent->residual(pose_I(X), xI);
+							const Vec2 residual_J = cam_J->residual(pose_J(X), xJ);
+							if (angle > 2.0 && pose_I.depth(X) > 0 && pose_J.depth(X) > 0) {
+								// Add a new track
+								Landmark & landmark = scene->structure[trackId];
+								landmark.X = X;
+								newTracks.insert(I);
 								newTracks.insert(J);
-							}
+							} // 3D point is valid
 							else
-							{
-								const View * view_J = scene->GetViews().at(J).get();
-								const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
-								const Pose3 pose_J = scene->GetPoseOrDie(view_J);
-								const Vec2 xJ = regionsRCT->at(J)->GetRegionsPositions()[trackViews.at(J)].coords().cast<double>();
+								newTracks.insert(J);
 
-								// Position of the point in view I
-								const Vec2 xI = regionsRCT->at(I)->GetRegionsPositions()[track.at(I)].coords().cast<double>();
-
-								// Try to triangulate a 3D point from J view
-								// A new 3D point must be added
-								// Triangulate it
-								const Vec2 xI_ud = camCurrent->get_ud_pixel(xI);
-								const Vec2 xJ_ud = cam_J->get_ud_pixel(xJ);
-								const Mat34 P_I = camCurrent->get_projective_equivalent(pose_I);
-								const Mat34 P_J = cam_J->get_projective_equivalent(pose_J);
-								Vec3 X = Vec3::Zero();
-								TriangulateDLT(P_I, xI_ud.homogeneous(), P_J, xJ_ud.homogeneous(), &X);
-								// Check triangulation result
-								const double angle = AngleBetweenRay(pose_I, camCurrent, pose_J, cam_J, xI, xJ);
-								const Vec2 residual_I = camCurrent->residual(pose_I(X), xI);
-								const Vec2 residual_J = cam_J->residual(pose_J(X), xJ);
-								if (
-									//  - Check angle (small angle leads to imprecise triangulation)
-									angle > 2.0 &&
-									//  - Check positive depth
-									pose_I.depth(X) > 0 &&
-									pose_J.depth(X) > 0
-									)
-								{
-									// Add a new track
-									Landmark & landmark = scene->structure[trackId];
-									landmark.X = X;
-									newTracks.insert(I);
-									newTracks.insert(J);
-								} // 3D point is valid
-								else
-								{
-									// We mark the view to add the observations once the point is triangulated
-									newTracks.insert(J);
-								} // 3D point is invalid
-							}
-						}
-					}// Go through all the views
-				}// If new point
-
-				 // If successfuly triangulated, add the valid view observations
-				if (scene->structure.count(trackId) != 0 && !newTracks.empty())
-				{
-					Landmark & landmark = scene->structure[trackId];
-					// Check if view feature point observations of the track are valid (residual, depth) or not
-					for (const IndexT &J : newTracks)
-					{
-						const View * view_J = scene->GetViews().at(J).get();
-						const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
-						const Pose3 pose_J = scene->GetPoseOrDie(view_J);
-						const Vec2 xJ = regionsRCT->at(J)->GetRegionsPositions()[trackViews.at(J)].coords().cast<double>();
-
-						const Vec2 residual = cam_J->residual(pose_J(landmark.X), xJ);
-						if (pose_J.depth(landmark.X) > 0)
-						{
-							landmark.obs[J] = Observation(xJ, trackViews.at(J));
 						}
 					}
-				}
-			}// All the tracks in the view
-		}
-	}
+				}// Go through all the views
+			}// If new point
 
+			 // If successfuly triangulated, add the valid view observations
+			if (scene->structure.count(trackId) != 0 && !newTracks.empty()) {
+				Landmark & landmark = scene->structure[trackId];
+				// Check if view feature point observations of the track are valid (residual, depth) or not
+				for (const IndexT &J : newTracks) {
+					const View * view_J = scene->GetViews().at(J).get();
+					const cameras::IntrinsicBase * cam_J = scene->GetIntrinsics().at(view_J->id_intrinsic).get();
+					const Pose3 pose_J = scene->GetPoseOrDie(view_J);
+					const Vec2 xJ = regionsRCT->at(J)->GetRegionsPositions()[trackViews.at(J)].coords().cast<double>();
+					const Vec2 residual = cam_J->residual(pose_J(landmark.X), xJ);
+
+					if (pose_J.depth(landmark.X) > 0)
+						landmark.obs[J] = Observation(xJ, trackViews.at(J));
+
+				}
+			}
+		}
+		}// All the tracks in the view
+	}
+	
 	bool Reconstructor::saveSceneData(Scene* scene, std::string& fileName)
 	{
 		if (openMVG::sfm::Save(*scene, stlplus::create_filespec(*currentFolder, fileName), ESfM_Data(ALL)))
-			return 1;
+			return Success;
 		else
-			return 0;
+			return Failure;
 	}
 }

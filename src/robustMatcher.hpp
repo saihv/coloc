@@ -40,6 +40,8 @@ namespace coloc
 		PairWiseMatches geometricMatches;
 
 	private:
+		bool relativePoseKernel();
+
 		FeatureMap featureRegions;
 		std::pair<size_t, size_t> *imageSize;
 		int iterationCount = 256;
@@ -47,6 +49,7 @@ namespace coloc
 	};
 
 	
+
 	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)
 	{
 		const uint32_t I = std::min(current_pair.first, current_pair.second);

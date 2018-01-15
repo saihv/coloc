@@ -65,16 +65,17 @@ namespace coloc
 	public:
 		void matchMaps(LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures);
 		bool computeScaleDifference(LocalizationData &data1, LocalizationData &data2, float &scaleDiff);
-		bool matchSceneWithMap(Scene scene);
+		bool matchSceneWithMap(Scene& scene);
 		bool setupMap(LocalizationData&, LocalizationParams&);
 		bool initMapMatchingInterface(LocalizationData &data, Regions_Provider &mapFeatures);
+		bool rescaleMap(Scene& scene, float scale);
 
 	private:
 		std::shared_ptr<Regions_Provider> mapFeatures = std::make_shared<Regions_Provider>();
 		EMatcherType matchingType;
 	};
 
-	bool Utils::setupMap(LocalizationData &data, LocalizationParams &params)
+	bool Utils::setupMap(LocalizationData& data, LocalizationParams& params)
 	{
 		if (data.scene.GetPoses().empty() || data.scene.GetLandmarks().empty()) {
 			std::cerr << "The input scene has no 3D content." << std::endl;
@@ -179,5 +180,17 @@ namespace coloc
 			scale += std::max(dist1, dist2) / std::min(dist1, dist2);
 		}
 		scaleDiff = scale / (commonFeatures.size() - 1);
+	}
+
+	bool Utils::rescaleMap(Scene& scene, float scale)
+	{
+		for (unsigned int i = 0; i < scene.structure.size(); ++i) {
+			scene.structure[i].X = scene.structure.at(i).X * scale;
+		}
+
+		for (unsigned int i = 0; i < scene.poses.size(); ++i) {
+			scene.poses[i] = Pose3(scene.poses.at(i).rotation(), scene.poses.at(i).translation() * scale);
+		}
+		return Success;
 	}
 }
