@@ -15,8 +15,7 @@ namespace coloc
 	public:
 		FeatureExtractor(LocalizationParams& params);
 		bool detectFeatures(unsigned int index, FeatureMap& regions, std::string& imageName);
-		void saveFeatureData(uint16_t id, FeatureMap& regions, std::string& name);
-		// int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
+		bool saveFeatureData(uint16_t id, FeatureMap& regions, std::string& name);	
 
 	private:
 		std::unique_ptr<features::Image_describer> image_describer;
@@ -46,13 +45,16 @@ namespace coloc
 		return Success;
 	}
 
-	void FeatureExtractor::saveFeatureData(uint16_t id, FeatureMap &regions, std::string &name)
+	bool FeatureExtractor::saveFeatureData(uint16_t id, FeatureMap &regions, std::string &name)
 	{
 		const std::string
 			sFeat = stlplus::create_filespec(stlplus::folder_part(name), stlplus::basename_part(name), "feat"),
 			sDesc = stlplus::create_filespec(stlplus::folder_part(name), stlplus::basename_part(name), "desc");
 
-		image_describer->Save(regions.at(id).get(), sFeat, sDesc);
+		if (!image_describer->Save(regions.at(id).get(), sFeat, sDesc))
+			return Failure;
+		else
+			return Success;
 	}
 }
 

@@ -62,12 +62,23 @@ namespace coloc
 {
 	class LocalizationData {
 	public:
+		LocalizationData& operator = (LocalizationData& data)
+		{
+			// regions = data.regions;
+			this->putativeMatches = data.putativeMatches;
+			this->geometricMatches = data.geometricMatches;
+			this->relativePoses = data.relativePoses;
+			this->overlap = data.overlap;
+			this->scene = data.scene;
+
+			return *this;
+		}
+
 		FeatureMap regions;
 		PairWiseMatches putativeMatches, geometricMatches;
 		InterPoseMap relativePoses;
 		std::map<Pair, double> overlap;
 		Scene scene;
-
 		std::unique_ptr<features::Regions> mapRegions;
 		std::vector<IndexT> mapRegionIdx;
 	};

@@ -47,7 +47,7 @@ using namespace openMVG::geometry;
 
 
 namespace coloc
-{
+{/*
 	template <typename SolverArg, typename ModelArg = Mat34>
 		class ACRKernel
 	{
@@ -122,10 +122,10 @@ namespace coloc
 		const cameras::IntrinsicBase * camera_;   // Intrinsic camera parameter
 	};
 
-
+*/
 		bool filterHomography(
-			const sfm::SfM_Data * sfm_data,
-			const std::shared_ptr<Regions_Provider> & regions_provider,
+			LocalizationParams& params,
+			Regions& regions1, Regions& regions2,
 			const Pair pairIndex,
 			const openMVG::matching::IndMatches & vec_PutativeMatches,
 			matching::IndMatches & geometric_inliers)
@@ -143,8 +143,20 @@ namespace coloc
 			//--
 
 			Mat2X xI, xJ;
-			matching_image_collection::MatchesPairToMat(pairIndex, vec_PutativeMatches, sfm_data, regions_provider, xI, xJ);
+			//matching_image_collection::MatchesPairToMat(pairIndex, vec_PutativeMatches, sfm_data, regions_provider, xI, xJ);
 
+			const Pinhole_Intrinsic
+				camL(params.imageSize.first, params.imageSize.second, (params.K)(0, 0), (params.K)(0, 2), (params.K)(1, 2)),
+				camR(params.imageSize.first, params.imageSize.second, (params.K)(0, 0), (params.K)(0, 2), (params.K)(1, 2));
+
+			const features::PointFeatures
+				feature_I = regions1.GetRegionsPositions(),
+				feature_J = regions2.GetRegionsPositions();
+			matching_image_collection::MatchesPointsToMat(
+				vec_PutativeMatches,
+				&camL, feature_I,
+				&camR, feature_J,
+				xI, xJ);
 			//--
 			// Robust estimation
 			//--
@@ -158,8 +170,8 @@ namespace coloc
 				Mat3>;
 
 			KernelType kernel(
-				xI, sfm_data->GetViews().at(iIndex)->ui_width, sfm_data->GetViews().at(iIndex)->ui_height,
-				xJ, sfm_data->GetViews().at(jIndex)->ui_width, sfm_data->GetViews().at(jIndex)->ui_height,
+				xI, params.imageSize.first, params.imageSize.second,
+				xJ, params.imageSize.first, params.imageSize.second,
 				false); // configure as point to point error model.
 
 						// Robustly estimate the Homography matrix with A Contrario ransac
@@ -170,7 +182,7 @@ namespace coloc
 				ACRANSAC(kernel, vec_inliers, 1024, &H, upper_bound_precision);
 
 			if (vec_inliers.size() > KernelType::MINIMUM_SAMPLES *2.5) {
-				m_dPrecision_robust = ACRansacOut.first;
+				double m_dPrecision_robust = ACRansacOut.first;
 				// update geometric_inliers
 				geometric_inliers.reserve(vec_inliers.size());
 				for (const uint32_t & index : vec_inliers) {
@@ -184,7 +196,7 @@ namespace coloc
 			}
 			return true;
 		}
-
+/*
 	bool robustRelativePose
 	(
 		const IntrinsicBase * intrinsics1,
@@ -319,4 +331,5 @@ namespace coloc
 
 		return bResection;
 	}
+	*/
 }

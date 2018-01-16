@@ -17,9 +17,9 @@ else()
 endif()
 
 if(MSVC)
-    set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install/share/openMVG/cmake")
-    set(PYTHON_LIBRARY "C:/Python27/libs/python27.lib")
-    set(PYTHON_INCLUDE_DIR "C:/Python27/include;C:/Python27/Lib/site-packages/numpy/core/include")
+    set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install_debug/share/openMVG/cmake")
+    set(PYTHON_LIBRARY "C:/Python36-32/libs/python36_d.lib")
+    set(PYTHON_INCLUDE_DIR "C:/Python36-32/include;C:/Python36-32/Lib/site-packages/numpy/core/include")
 endif(MSVC)
 
 if(UNIX)
@@ -54,6 +54,21 @@ file(
 
 add_executable(coloc ${coloc_headers} ${coloc_files})
 target_link_libraries(coloc
+  openMVG_system
+  openMVG_image
+  openMVG_features
+  openMVG_multiview
+  openMVG_matching_image_collection
+  openMVG_sfm
+  openMVG_geometry
+  ceres
+  stlplus
+  easyexif
+  vlsift
+  ${PYTHON_LIBRARIES})
+
+add_executable(updatetest src/updatetest.cpp)
+target_link_libraries(updatetest
   openMVG_system
   openMVG_image
   openMVG_features
