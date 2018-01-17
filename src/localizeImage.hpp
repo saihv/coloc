@@ -116,7 +116,7 @@ namespace coloc
 	bool Localizer::localizeImage(std::string& imageName, Pose3& pose, LocalizationData &data, Cov6 &covariance)
 	{
 		using namespace openMVG::features;
-		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
+		openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
 		image::Image<unsigned char> imageGray;
 
 		if (!ReadImage(imageName.c_str(), &imageGray)) {

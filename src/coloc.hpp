@@ -72,7 +72,7 @@ namespace coloc
 
 		logger.logMaptoPLY(data.scene, mapFile);
 		data.scene.s_root_path = params.imageFolder;
-		mapReady = utils.setupMap(data, params);
+		mapReady = data.setupFeatureDatabase(params);
 	}
 
 	void ColoC::intraPoseEstimator(int& droneId, Pose3& pose, Cov6& cov)
@@ -116,7 +116,7 @@ namespace coloc
 		tempReconstructor.reconstructScene(tempScene, origin, 1.0, false);
 
 		tempScene.scene.s_root_path = params.imageFolder;
-		mapReady = tempUtils.setupMap(tempScene, params);
+		mapReady = tempScene.setupFeatureDatabase(params);
 
 		std::vector <IndMatch> commonFeatures;
 		robustMatcher.matchMaps(data, tempScene, commonFeatures);
@@ -157,20 +157,19 @@ namespace coloc
 		std::string newMapFile = params.imageFolder + "newmap.ply";
 		logger.logMaptoPLY(updateData.scene, newMapFile);
 
-		Utils updateUtils;
-		bool newMapReady = updateUtils.setupMap(updateData, params);
+		bool newMapReady = updateData.setupFeatureDatabase(params);
 
 		float scaleDiff;
 		if (newMapReady) {
 			std::vector <IndMatch> commonFeatures;
 			robustMatcher.matchMaps(data, updateData, commonFeatures);
-			scaleDiff = updateUtils.computeScaleDifference(params, data, updateData, commonFeatures);
+			scaleDiff = utils.computeScaleDifference(params, data, updateData, commonFeatures);
 			std::cout << "Scale factor ratio computed during update as " << scaleDiff << std::endl;
-			updateUtils.rescaleMap(updateData.scene, scaleDiff);
+			utils.rescaleMap(updateData.scene, scaleDiff);
 		}
 
 		data = updateData;
-		utils.setupMap(data, params);
+		data.setupFeatureDatabase(params);
 
 		//logger.logMaptoPLY(data.scene, mapFile);
 		//data.scene.s_root_path = params.imageFolder;

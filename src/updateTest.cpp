@@ -47,7 +47,7 @@ int main()
 	robustMatcher.filterMatches(data1.regions, data1.putativeMatches, data1.geometricMatches, data1.relativePoses);
 	data1.scene.s_root_path = params.imageFolder;
 	reconstructor.reconstructScene(data1, Pose3(Mat3::Identity(), Vec3::Zero()), 1.0, true);
-	utils.setupMap(data1, params);
+	data1.setupFeatureDatabase(params);
 
 	std::string filename3 = params.imageFolder + "img__Quad" + std::to_string(0) + "_" + "0010" + ".png";
 	std::string filename4 = params.imageFolder + "img__Quad" + std::to_string(1) + "_" + "0010" + ".png";
@@ -61,14 +61,14 @@ int main()
 	robustMatcher.filterMatches(data2.regions, data2.putativeMatches, data2.geometricMatches, data2.relativePoses);
 	data2.scene.s_root_path = params.imageFolder;
 	recNew.reconstructScene(data2, Pose3(Mat3::Identity(), Vec3::Zero()), 1.0, true);
-	utils2.setupMap(data2, params);
+	data2.setupFeatureDatabase(params);
 
 	std::vector <IndMatch> putativeMatches, geometricMatches;
 	robustMatcher.matchMaps(data1, data2, filteredMatches);
 	utils2.drawMatches(drawFiltered, filename1, filename3, *data1.mapRegions.get(), *data2.mapRegions.get(), filteredMatches);
 
 	float scaleDiff = utils.computeScaleDifference(params, data1, data2, filteredMatches);
-
+	std::cout << "Scale factor ratio computed during update as " << scaleDiff << std::endl;
 	std::string newMap = "new.ply";
 	logger.logMaptoPLY(data2.scene, newMap);
 	utils2.rescaleMap(data2.scene, scaleDiff);

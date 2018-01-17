@@ -71,9 +71,9 @@ namespace coloc
 			this->overlap = data.overlap;
 			this->scene = data.scene;
 
-			for (auto const& x : data.regions)
+			//for (auto const& x : data.regions)
 				// this->regions.insert({ x.first, std::make_unique<Regions>(*x.second) });
-				this->regions.emplace_hint(this->regions.end(), x.first, std::make_unique<Regions>(*x.second));
+				//this->regions.emplace_hint(this->regions.end(), x.first, std::make_unique<Regions>(*x.second));
 			
 			return *this;
 		}

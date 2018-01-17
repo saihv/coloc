@@ -55,8 +55,6 @@ using namespace openMVG::matching_image_collection;
 
 #include <iostream>
 
-#include "estimationKernel.hpp"
-
 using namespace openMVG;
 using namespace openMVG::features;
 using namespace openMVG::matching;
@@ -71,7 +69,7 @@ namespace coloc
 			this->params = &params;
 		}
 
-		std::unique_ptr <RelativePose_Info> computeRelativePose(char filterType, Pair, FeatureMap& regions, PairWiseMatches& putativeMatches);
+		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair, FeatureMap& regions, PairWiseMatches& putativeMatches);
 		void filterMatches(FeatureMap& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, InterPoseMap& relativePoses);
 		bool matchMaps(LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures);
 		PairWiseMatches geometricMatches;
@@ -215,7 +213,7 @@ namespace coloc
 			commonFeatures.push_back(putativeMatches[relativePose.vec_inliers[ic]]);
 	}
 
-	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(char filterType, Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)
+	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)
 	{
 		const uint32_t I = std::min(current_pair.first, current_pair.second);
 		const uint32_t J = std::max(current_pair.first, current_pair.second);
@@ -239,9 +237,9 @@ namespace coloc
 
 		bool status;
 
-		if (filterType == 'H')
+		if (params->filterType == 'H')
 			status = filterHomography(&camL, &camR, xL, xR, relativePose, *params);
-		else if (filterType == 'E')
+		else if (params->filterType == 'E')
 			status = filterEssential(&camL, &camR, xL, xR, relativePose, *params);
 		else {
 			std::cout << "Unknown filtering type: aborting." << std::endl;
@@ -267,7 +265,7 @@ namespace coloc
 		for (const auto matchedPair : putativeMatches) {
 			Pair currentPair = matchedPair.first;
 			std::vector <IndMatch> pairMatches = putativeMatches[currentPair];
-			std::unique_ptr<RelativePose_Info> relativePose = computeRelativePose('H', matchedPair.first, regions, putativeMatches);
+			std::unique_ptr<RelativePose_Info> relativePose = computeRelativePose(matchedPair.first, regions, putativeMatches);
 
 			std::vector <IndMatch> vec_geometricMatches;
 			for (int ic = 0; ic < relativePose->vec_inliers.size(); ++ic) 
