@@ -22,6 +22,7 @@ int main()
 	params.imageSize = std::make_pair(640, 480);
 	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
 	params.imageFolder = "C:/Users/saihv/Desktop/updatetest/";
+	params.filterType = 'H';
 
 	FeatureExtractor detector(params);
 	FeatureMatcher matcher(params);
@@ -30,9 +31,11 @@ int main()
 	Localizer localizer(params);
 	Logger logger;
 	Utils utils, utils2;
+	std::string drawFiltered = "filteredMatches.svg";
 
 	LocalizationData data1, data2;
-	
+	std::vector <IndMatch> filteredMatches;
+
 	std::string filename1 = params.imageFolder + "img__Quad" + std::to_string(0) + "_" + "0000" + ".png";
 	std::string filename2 = params.imageFolder + "img__Quad" + std::to_string(1) + "_" + "0000" + ".png";
 	detector.detectFeatures(0, data1.regions, filename1);
@@ -61,55 +64,20 @@ int main()
 	recNew.reconstructScene(data2, Pose3(Mat3::Identity(), Vec3::Zero()), 1.0, true);
 	utils2.setupMap(data2, params);
 
-	std::vector <IndMatch> putativeMatches, filteredMatches, geometricMatches;
-
-	DistanceRatioMatch(0.8, BRUTE_FORCE_HAMMING, *data1.mapRegions.get(), *data2.mapRegions.get(), putativeMatches);
-	utils.filterMapMatches(params, *data1.mapRegions.get(), *data2.mapRegions.get(), putativeMatches, geometricMatches);
-	filterHomography(params, *data1.mapRegions.get(), *data2.mapRegions.get(), { 0,1 }, putativeMatches, filteredMatches);
-
-	std::string drawPutative = "putativeMatches.svg";
-	std::string drawGeometric = "geometricMatches.svg";
-	std::string drawFiltered = "filteredMatches.svg";
-
-	utils2.drawMatches(drawPutative, filename1, filename3, *data1.mapRegions.get(), *data2.mapRegions.get(), putativeMatches);
+	std::vector <IndMatch> putativeMatches, geometricMatches;
+	robustMatcher.matchMaps(data1, data2, filteredMatches);
 	utils2.drawMatches(drawFiltered, filename1, filename3, *data1.mapRegions.get(), *data2.mapRegions.get(), filteredMatches);
-	utils2.drawMatches(drawGeometric, filename1, filename3, *data1.mapRegions.get(), *data2.mapRegions.get(), geometricMatches);
 
-	Mat pt3D_1, pt3D_2;
+	float scaleDiff = utils.computeScaleDifference(params, data1, data2, filteredMatches);
 
-	pt3D_1.resize(3, filteredMatches.size());
-	pt3D_2.resize(3, filteredMatches.size());
-
-	float scale = 0.0;
-
-	for (size_t i = 0; i < filteredMatches.size(); ++i)
-	{
-		pt3D_1.col(i) = data1.scene.GetLandmarks().at(data1.mapRegionIdx[filteredMatches[i].i_]).X;
-		pt3D_2.col(i) = data2.scene.GetLandmarks().at(data2.mapRegionIdx[filteredMatches[i].j_]).X;
-	}
-
-	for (size_t i = 0; i < filteredMatches.size() - 1; ++i)
-	{
-		Vec3 X11 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[filteredMatches[i].i_]).X;
-		Vec3 X12 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[filteredMatches[i + 1].i_]).X;
-
-		Vec3 X21 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[filteredMatches[i].j_]).X;
-		Vec3 X22 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[filteredMatches[i + 1].j_]).X;
-
-		float dist1 = (X12 - X11).norm();
-		float dist2 = (X22 - X21).norm();
-
-		scale += std::max(dist1, dist2) / std::min(dist1, dist2);
-	}
-	float scaleDiff = scale / (filteredMatches.size() - 1);
-
+	std::string newMap = "new.ply";
+	logger.logMaptoPLY(data2.scene, newMap);
 	utils2.rescaleMap(data2.scene, scaleDiff);
 
-	std::string mapOriginal = "original.ply";
-	std::string mapFinal = "scaled.ply";
+	std::string oldMap = "old.ply";
+	std::string newScaled = "scaled.ply";
 
-	logger.logMaptoPLY(data2.scene, mapOriginal);
-	logger.logMaptoPLY(data2.scene, mapFinal);
-
+	logger.logMaptoPLY(data2.scene, newScaled);
+	logger.logMaptoPLY(data1.scene, oldMap);
 	getchar();
 }

@@ -65,15 +65,14 @@ namespace coloc
 	class Utils
 	{
 	public:
-		void matchMaps(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures);
-		bool computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, float &scaleDiff);
+		
+		float computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures);
 		bool matchSceneWithMap(Scene& scene);
 		bool setupMap(LocalizationData&, LocalizationParams&);
 		bool initMapMatchingInterface(LocalizationData &data, Regions_Provider &mapFeatures);
 		bool rescaleMap(Scene& scene, float scale);
 		int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 		bool drawMatches(std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches);
-		void filterMapMatches(LocalizationParams& params, Regions& regions1, Regions& regions2, std::vector<IndMatch>& commonFeatures, std::vector<IndMatch>& filteredMatches);
 	private:
 		
 		std::shared_ptr<Regions_Provider> mapFeatures;
@@ -92,7 +91,7 @@ namespace coloc
 			regions2.GetRegionsPositions(),
 			matches,
 			outputFilename,
-			true
+			false
 		);
 		return Success;
 	}
@@ -153,87 +152,28 @@ namespace coloc
 		return Success;
 	}
 
-	void Utils::filterMapMatches(LocalizationParams& params, Regions& regions1, Regions& regions2, std::vector<IndMatch>& commonFeatures, std::vector<IndMatch>& filteredMatches)
+	float Utils::computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures)
 	{
-		const PointFeatures featI = regions1.GetRegionsPositions();
-		const PointFeatures featJ = regions2.GetRegionsPositions();
-
-		Mat xL(2, commonFeatures.size());
-		Mat xR(2, commonFeatures.size());
-		for (size_t k = 0; k < commonFeatures.size(); ++k) {
-			xL.col(k) = featI[commonFeatures[k].i_].coords().cast<double>();
-			xR.col(k) = featJ[commonFeatures[k].j_].coords().cast<double>();
-		}
-
-		RelativePose_Info relativePose;
-
-		const Pinhole_Intrinsic
-			camL(params.imageSize.first, params.imageSize.second, (params.K)(0, 0), (params.K)(0, 2), (params.K)(1, 2)),
-			camR(params.imageSize.first, params.imageSize.second, (params.K)(0, 0), (params.K)(0, 2), (params.K)(1, 2));
-
-		if (!robustRelativePose(&camL, &camR, xL, xR, relativePose, params.imageSize, params.imageSize, 256)) {
-			std::cerr << " /!\\ Robust relative pose estimation failure." << std::endl;
-		}
-
-		else {
-			std::cout << "Filtering complete, number of inliers found: " << relativePose.vec_inliers.size() << "\n"
-				<< "\t Total number of matches: " << commonFeatures.size()
-				<< std::endl;
-		}
-		for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
-			filteredMatches.push_back(commonFeatures[relativePose.vec_inliers[ic]]);
-
-		std::string file1 = params.imageFolder + "img__Quad0_0000.png";
-		std::string file2 = params.imageFolder + "img__Quad2_0251.png";
-
-		//drawMatches(file1, file2, regions1, regions2, filteredMatches);
-	}
-
-	void Utils::matchMaps(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> &commonFeatures)
-	{
-		std::vector <IndMatch> putativeMatches, homofiltered;
-		
-		matching::DistanceRatioMatch(
-			0.8, matchingType,
-			*data1.mapRegions.get(),
-			*data2.mapRegions.get(),
-			putativeMatches);
-
-		std::string file1 = params.imageFolder + "img__Quad0_0000.png";
-		std::string file2 = params.imageFolder + "img__Quad2_0251.png";
-		//drawMatches(file1, file2, *data1.mapRegions.get(), *data2.mapRegions.get(), putativeMatches);
-		filterHomography(params, *data1.mapRegions.get(), *data2.mapRegions.get(), { 0,1 }, putativeMatches, homofiltered);
-		filterMapMatches(params, *data1.mapRegions.get(), *data2.mapRegions.get(), homofiltered, commonFeatures);
-	}
-
-	bool Utils::computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, float &scaleDiff)
-	{
-		std::vector<IndMatch> commonFeatures;
-		matchMaps(params, data1, data2, commonFeatures);
-
-		if (commonFeatures.empty())
-		{
+		if (commonFeatures.empty()) {
 			std::cout << "No common features between the maps." << std::endl;
-			return EXIT_FAILURE;
+			return Failure;
 		}
 
-		std::cout << "Number of common features: " << commonFeatures.size() << std::endl;
+		std::cout << "Number of common features between the maps: " << commonFeatures.size() << std::endl;
 
 		Mat pt3D_1, pt3D_2;
 		
 		pt3D_1.resize(3, commonFeatures.size());
 		pt3D_2.resize(3, commonFeatures.size());
 
-		float scale = 0.0;
+		float scale = 0.0, scaleDiff = 1.0;
 
-		for (size_t i = 0; i < commonFeatures.size(); ++i)
-		{
+		for (size_t i = 0; i < commonFeatures.size(); ++i) {
 			pt3D_1.col(i) = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
 			pt3D_2.col(i) = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i].j_]).X;	
 		}
 
-		for (size_t i = 0; i < commonFeatures.size() - 1; ++i)
-		{
+		for (size_t i = 0; i < commonFeatures.size() - 1; ++i) {
 			Vec3 X11 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
 			Vec3 X12 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i + 1].i_]).X;
 			
@@ -243,9 +183,10 @@ namespace coloc
 			float dist1 = (X12 - X11).norm();
 			float dist2 = (X22 - X21).norm();
 
-			scale += std::max(dist1, dist2) / std::min(dist1, dist2);
+			scale += dist1/dist2;
 		}
 		scaleDiff = scale / (commonFeatures.size() - 1);
+		return scaleDiff;
 	}
 
 	bool Utils::rescaleMap(Scene& scene, float scale)

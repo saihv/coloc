@@ -31,5 +31,6 @@ namespace coloc
 		std::string featureDetectorType;
 		std::pair <size_t, size_t> imageSize;
 		Mat3 K;
+		char filterType;
 	};
 }
