@@ -9,7 +9,6 @@
 #include "plotUtils.hpp"
 #include "logUtils.hpp"
 #include "localizationUtils.hpp"
-#include "estimationKernel.hpp"
 #include <filesystem>
 
 using namespace coloc;

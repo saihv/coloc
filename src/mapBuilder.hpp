@@ -178,12 +178,9 @@ namespace coloc
 	{
 		Mat3 R1 = origin.rotation();
 		Mat3 R2 = relativePose.rotation();
-
 		Mat3 Rfinal = R2*R1;
-
 		Vec3 t1 = origin.translation();
 		Vec3 t2 = relativePose.translation();
-
 		Vec3 tfinal = t1 + t2;
 
 		return Pose3(Rfinal, tfinal);
@@ -341,7 +338,6 @@ namespace coloc
 
 					if (pose_J.depth(landmark.X) > 0)
 						landmark.obs[J] = Observation(xJ, trackViews.at(J));
-
 				}
 			}
 		}

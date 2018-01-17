@@ -48,7 +48,6 @@
 
 #include "localizationParams.hpp"
 #include "localizationData.hpp"
-#include "estimationKernel.hpp"
 
 #include <cstdlib>
 #include <iostream>
@@ -65,12 +64,12 @@ namespace coloc
 	class Utils
 	{
 	public:
-		
 		float computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures);
 		bool matchSceneWithMap(Scene& scene);
 		bool setupMap(LocalizationData&, LocalizationParams&);
 		bool initMapMatchingInterface(LocalizationData &data, Regions_Provider &mapFeatures);
 		bool rescaleMap(Scene& scene, float scale);
+
 		int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 		bool drawMatches(std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches);
 	private:
@@ -93,62 +92,6 @@ namespace coloc
 			outputFilename,
 			false
 		);
-		return Success;
-	}
-
-	bool Utils::setupMap(LocalizationData& data, LocalizationParams& params)
-	{
-		mapFeatures = std::make_shared<Regions_Provider>();
-		
-		if (data.scene.GetPoses().empty() || data.scene.GetLandmarks().empty()) {
-			std::cerr << "The input scene has no 3D content." << std::endl;
-			return Failure;
-		}
-
-		C_Progress_display progress;
-		std::unique_ptr<Regions> regions_type;
-
-		if (params.featureDetectorType == "AKAZE") {
-			regions_type.reset(new openMVG::features::AKAZE_Float_Regions);
-			matchingType = BRUTE_FORCE_L2;
-		}
-		else if (params.featureDetectorType == "SIFT") {
-			regions_type.reset(new openMVG::features::SIFT_Regions);
-			matchingType = CASCADE_HASHING_L2;
-		}
-		else if (params.featureDetectorType == "BINARY") {
-			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
-			matchingType = BRUTE_FORCE_HAMMING;
-		}
-
-		mapFeatures->load(data.scene, params.imageFolder, regions_type, &progress);
-
-		if (!initMapMatchingInterface(data, *mapFeatures.get())) {
-			std::cerr << "Cannot initialize the SfM localizer" << std::endl;
-			return Failure;
-		}
-		else
-			std::cout << "Initialized SFM localizer with map" << std::endl;
-
-		mapFeatures.reset();
-		return Success;
-	}
-
-	bool Utils::initMapMatchingInterface(LocalizationData &data, Regions_Provider& mapFeatures)
-	{
-		if (data.scene.GetPoses().empty() || data.scene.GetLandmarks().empty()) {
-			std::cerr << std::endl << "The input Scene file have not 3D content to match with." << std::endl;
-			return Failure;
-		}
-
-		data.mapRegions.reset(mapFeatures.getRegionsType()->EmptyClone());
-		for (const auto & landmark : data.scene.GetLandmarks()) {
-			if (landmark.second.obs.at(0).id_feat != UndefinedIndexT) {
-				const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(0);
-				viewRegions->CopyRegion(landmark.second.obs.at(0).id_feat, data.mapRegions.get());
-				data.mapRegionIdx.push_back(landmark.first);
-			}
-		}
 		return Success;
 	}
 

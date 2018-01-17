@@ -44,7 +44,7 @@ namespace coloc
 
 		std::unique_ptr<features::Regions> regionsCurrent;
 		bool localizeImage(std::string&, Pose3&, LocalizationData&, Cov6&);
-		bool matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr);
+		bool matchSceneWithMap(IntrinsicBase* cam, LocalizationData &data, const features::Regions & queryRegions, Image_Localizer_Match_Data * trackPtr);
 		bool refine(Pose3&, Image_Localizer_Match_Data&, Cov6&);
 		
 	private:
@@ -66,12 +66,12 @@ namespace coloc
 		std::vector<IndexT> mapDescIdx;
 	};
 
-	bool Localizer::matchLocalize(LocalizationData &data, const features::Regions & queryRegions, geometry::Pose3 & pose, Image_Localizer_Match_Data * trackPtr)
+	bool Localizer::matchSceneWithMap(IntrinsicBase* cam, LocalizationData &data, const features::Regions & queryRegions, Image_Localizer_Match_Data * trackPtr)
 	{
-		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
-		
-		if (scenePtr == nullptr)
-			return EXIT_FAILURE;
+		if (scenePtr == nullptr) {
+			std::cout << "No existing map. Localization cannot continue." << std::endl;
+			return Failure;
+		}
 
 		std::vector<IndMatch> trackedFeatures;
 
@@ -88,38 +88,35 @@ namespace coloc
 
 		std::cout << "Number of tracked features: " << trackedFeatures.size() << std::endl;
 
-		Image_Localizer_Match_Data trackData;
-		if (trackPtr)
-			trackData.error_max = trackPtr->error_max;
+		//trackPtr.error_max = trackPtr->error_max;
 		
-		trackData.pt3D.resize(3, trackedFeatures.size());
-		trackData.pt2D.resize(2, trackedFeatures.size());
+		trackPtr->pt3D.resize(3, trackedFeatures.size());
+		trackPtr->pt2D.resize(2, trackedFeatures.size());
 		Mat2X pt2D_original(2, trackedFeatures.size());
 
 		scenePtr = &data.scene;
 
 		for (size_t i = 0; i < trackedFeatures.size(); ++i) {
-			trackData.pt3D.col(i) = scenePtr->GetLandmarks().at(data.mapRegionIdx[trackedFeatures[i].i_]).X;
-			trackData.pt2D.col(i) = queryRegions.GetRegionPosition(trackedFeatures[i].j_);
-			pt2D_original.col(i) = trackData.pt2D.col(i);
+			trackPtr->pt3D.col(i) = scenePtr->GetLandmarks().at(data.mapRegionIdx[trackedFeatures[i].i_]).X;
+			trackPtr->pt2D.col(i) = queryRegions.GetRegionPosition(trackedFeatures[i].j_);
+			pt2D_original.col(i) = trackPtr->pt2D.col(i);
 
-			if (&cam && cam.have_disto())
-				trackData.pt2D.col(i) = cam.get_ud_pixel(trackData.pt2D.col(i));
+			if (&cam && cam->have_disto())
+				trackPtr->pt2D.col(i) = cam->get_ud_pixel(trackPtr->pt2D.col(i));
 		}
 		
-		bool localizationStatus = SfM_Localizer::Localize(resection::SolverType::P3P_KE_CVPR17, *imageSize, &cam, trackData, pose);
-		trackData.pt2D = std::move(pt2D_original);
+		//trackPtr->pt2D = std::move(pt2D_original);
 
-		if (trackPtr)
-			(*trackPtr) = std::move(trackData);
+		//if (trackPtr)
+		//	(*trackPtr) = std::move(trackData);
 
-		return localizationStatus;
+		return Success;
 	}
 	
 	bool Localizer::localizeImage(std::string& imageName, Pose3& pose, LocalizationData &data, Cov6 &covariance)
 	{
 		using namespace openMVG::features;
-
+		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
 		image::Image<unsigned char> imageGray;
 
 		if (!ReadImage(imageName.c_str(), &imageGray)) {
@@ -128,25 +125,29 @@ namespace coloc
 		image_describer->Describe(imageGray, regionsCurrent);
 		std::cout << "#regions detected in query image: " << regionsCurrent->RegionCount() << std::endl;
 
-		sfm::Image_Localizer_Match_Data matching_data;
+		Image_Localizer_Match_Data matching_data;
 		matching_data.error_max = std::numeric_limits<double>::infinity();
 
-		if (!this->matchLocalize(data, *regionsCurrent.get(), pose, &matching_data)) {
-			std::cout << "Localization unsuccessful" << std::endl;
+		Image_Localizer_Match_Data trackData;
+
+		if (!this->matchSceneWithMap(&cam, data, *regionsCurrent.get(), &matching_data)) {
+			std::cout << "Unable to match view with existing map" << std::endl;
 			return Failure;
 		}
 		else {
-			std::cout << "Localization successful" << std::endl;
-			std::shared_ptr<cameras::IntrinsicBase> optional_intrinsic;
+			bool localizationStatus = SfM_Localizer::Localize(resection::SolverType::P3P_KE_CVPR17, *imageSize, &cam, matching_data, pose);
+			if (!localizationStatus) {
+				std::cout << "Localization unsuccessful" << std::endl;
+				return Failure;
+			}
+			else {
+				std::cout << "Localization successful" << std::endl;
 
-			optional_intrinsic = std::make_shared<cameras::Pinhole_Intrinsic_Radial_K3>(
-				imageGray.Width(), imageGray.Height(),
-				(*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
+				if (!this->refine(pose, matching_data, covariance))
+					std::cerr << "Refining pose for image failed." << std::endl;
 
-			if (!this->refine(pose, matching_data, covariance))
-				std::cerr << "Refining pose for image failed." << std::endl;
-	
-			return Success;
+				return Success;
+			}
 		}
 
 	}
