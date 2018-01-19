@@ -13,7 +13,7 @@ namespace coloc
 {
 	class FeatureExtractor {
 	public:
-		FeatureExtractor(LocalizationParams& params);
+		explicit FeatureExtractor(LocalizationParams& params);
 		bool detectFeatures(unsigned int index, FeatureMap& regions, std::string& imageName);
 		bool saveFeatureData(uint16_t id, FeatureMap& regions, std::string& name);	
 

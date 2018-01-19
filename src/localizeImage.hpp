@@ -22,7 +22,7 @@ namespace coloc
 {
 	class Localizer {
 	public:
-		Localizer(LocalizationParams& params)
+		explicit Localizer(LocalizationParams& params)
 		{
 			if (params.featureDetectorType == "SIFT") {
 				image_describer.reset(new features::SIFT_Image_describer(features::SIFT_Image_describer::Params(), true));

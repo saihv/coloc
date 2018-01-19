@@ -158,7 +158,7 @@ namespace coloc
 		if (relativePose_info.vec_inliers.size() < KernelType::MINIMUM_SAMPLES *2.5)
 			return Failure;
 		else {
-			double m_dPrecision_robust = ACRansacOut.first;
+			relativePose_info.found_residual_precision = ACRansacOut.first;
 
 			Vec3 t = relativePose_info.essential_matrix.col(2).normalized();	
 			Mat3 R;
@@ -209,8 +209,12 @@ namespace coloc
 			std::cout << "Unknown filtering type: aborting." << std::endl;
 			return Failure;
 		}
-		for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
-			commonFeatures.push_back(putativeMatches[relativePose.vec_inliers[ic]]);
+		if (!status) 
+			std::cerr << "Unable to find any common features between maps." << std::endl;
+		else {
+			for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
+				commonFeatures.push_back(putativeMatches[relativePose.vec_inliers[ic]]);
+		}
 	}
 
 	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)

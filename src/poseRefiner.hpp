@@ -65,10 +65,6 @@ namespace coloc
 
 	bool PoseRefiner::refinePose(SfM_Data &scene, const Optimize_Options options, std::vector<std::array<double, 6 * 6> > &poseCovariance = std::vector<std::array<double, 36> >())
 	{
-		double pose_center_robust_fitting_error = 0.0;
-		openMVG::geometry::Similarity3 sim_to_center;
-		bool b_usable_prior = false;
-
 		ceres::Problem problem;
 
 		// Data wrapper for refinement:

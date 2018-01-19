@@ -20,7 +20,7 @@ namespace coloc
 {
 	class FeatureMatcher {
 	public:
-		FeatureMatcher(LocalizationParams& params);
+		explicit FeatureMatcher(LocalizationParams& params);
 
 		Pair_Set handlePairs(int);
 		void computePairMatches(const Pair& pairIdx, std::unique_ptr<features::Regions>& regions1, std::unique_ptr<features::Regions>& regions2, PairWiseMatches& putativeMatches);

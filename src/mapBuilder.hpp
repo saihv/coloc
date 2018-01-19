@@ -33,12 +33,10 @@ namespace coloc
 {
 	class Reconstructor {
 	public:
-		Reconstructor(LocalizationParams& params)
-		{
-			this->imageSize = &params.imageSize;
-			this->K = &params.K;
-			this->currentFolder = &params.imageFolder;
-		}
+		explicit Reconstructor(LocalizationParams& params) 
+			: imageSize(&params.imageSize), K(&params.K),
+			  currentFolder(&params.imageFolder)
+		{	}
 
 		void reconstructScene(LocalizationData& data, Pose3, float, bool);
 

@@ -18,12 +18,12 @@ namespace coloc
 	{
 	public:
 		ColoC(int& nDrones, int& nImageStart, LocalizationParams& params)
-			: detector(params), matcher(params), robustMatcher(params), reconstructor(params),
+			: params(params), detector(params), matcher(params), robustMatcher(params), reconstructor(params),
 			localizer(params)
 		{
 			this->numDrones = nDrones;
 			this->imageNumber = nImageStart;
-			this->params = params;
+			this->mapReady = false;
 		}
 		void intraPoseEstimator(int& droneId, Pose3& pose, Cov6& cov);
 		void interPoseEstimator(int sourceId, int destId, Pose3& origin, Pose3& pose, Cov6& cov);
@@ -159,11 +159,10 @@ namespace coloc
 
 		bool newMapReady = updateData.setupFeatureDatabase(params);
 
-		float scaleDiff;
 		if (newMapReady) {
 			std::vector <IndMatch> commonFeatures;
 			robustMatcher.matchMaps(data, updateData, commonFeatures);
-			scaleDiff = utils.computeScaleDifference(params, data, updateData, commonFeatures);
+			float scaleDiff = utils.computeScaleDifference(params, data, updateData, commonFeatures);
 			std::cout << "Scale factor ratio computed during update as " << scaleDiff << std::endl;
 			utils.rescaleMap(updateData.scene, scaleDiff);
 		}

@@ -34,8 +34,9 @@ namespace coloc
 		char filterType;
 
 		LocalizationParams() { };
-		LocalizationParams(std::string& filename) { readParamsFromFile(filename); }
+		//LocalizationParams(std::string& filename) { readParamsFromFile(filename); }
 
+	/*
 	private:
 		bool readParamsFromFile(std::string& filename)
 		{
@@ -54,5 +55,6 @@ namespace coloc
 				}
 			}
 		}
+		*/
 	};
 }
