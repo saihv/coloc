@@ -138,7 +138,7 @@ namespace coloc
 			Vec3 t = currentPose.translation();
 
 			plotLocation(t, seedPoseColor);
-			// std::cout << "Plotting seed pose at " << t[0] << "," << t[1] << "," << t[2] << std::endl;
+			std::cout << "Plotting seed pose at " << t[0] << "," << t[1] << "," << t[2] << std::endl;
 		}
 
 		plotMap(scene);

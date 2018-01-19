@@ -68,7 +68,7 @@ namespace coloc
 
 	bool Localizer::matchSceneWithMap(IntrinsicBase* cam, LocalizationData &data, const features::Regions & queryRegions, Image_Localizer_Match_Data * trackPtr)
 	{
-		if (scenePtr == nullptr) {
+		if (&data.scene == nullptr) {
 			std::cout << "No existing map. Localization cannot continue." << std::endl;
 			return Failure;
 		}
@@ -94,10 +94,8 @@ namespace coloc
 		trackPtr->pt2D.resize(2, trackedFeatures.size());
 		Mat2X pt2D_original(2, trackedFeatures.size());
 
-		scenePtr = &data.scene;
-
 		for (size_t i = 0; i < trackedFeatures.size(); ++i) {
-			trackPtr->pt3D.col(i) = scenePtr->GetLandmarks().at(data.mapRegionIdx[trackedFeatures[i].i_]).X;
+			trackPtr->pt3D.col(i) = data.scene.GetLandmarks().at(data.mapRegionIdx[trackedFeatures[i].i_]).X;
 			trackPtr->pt2D.col(i) = queryRegions.GetRegionPosition(trackedFeatures[i].j_);
 			pt2D_original.col(i) = trackPtr->pt2D.col(i);
 

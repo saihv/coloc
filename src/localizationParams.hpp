@@ -32,5 +32,27 @@ namespace coloc
 		std::pair <size_t, size_t> imageSize;
 		Mat3 K;
 		char filterType;
+
+		LocalizationParams() { };
+		LocalizationParams(std::string& filename) { readParamsFromFile(filename); }
+
+	private:
+		bool readParamsFromFile(std::string& filename)
+		{
+			std::istringstream inputFile(filename);
+
+			std::string line;
+			while (std::getline(inputFile, line))
+			{
+				std::istringstream is_line(line);
+				std::string key;
+				if (std::getline(is_line, key, '='))
+				{
+					std::string value;
+					if (std::getline(is_line, value))
+						std::string k = value;
+				}
+			}
+		}
 	};
 }

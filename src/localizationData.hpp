@@ -57,7 +57,6 @@ using namespace openMVG::features;
 using namespace openMVG::matching;
 using namespace openMVG::sfm;
 
-
 namespace coloc
 {
 	class LocalizationData {
@@ -71,10 +70,13 @@ namespace coloc
 			this->overlap = data.overlap;
 			this->scene = data.scene;
 
-			//for (auto const& x : data.regions)
-				// this->regions.insert({ x.first, std::make_unique<Regions>(*x.second) });
+			//std::unique_ptr<Regions> regions = std::make_unique<Regions>();
+			//for (auto const & x : data.regions)
+			//	this->regions.insert({ x.first, std::make_unique<Regions>(*x.second) });
 				//this->regions.emplace_hint(this->regions.end(), x.first, std::make_unique<Regions>(*x.second));
 			
+			this->mapRegions = std::move(data.mapRegions);
+			this->mapRegionIdx = data.mapRegionIdx;
 			return *this;
 		}
 

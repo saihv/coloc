@@ -26,14 +26,16 @@ int main()
 	coloc.poseFile = params.imageFolder + "poses.txt";
 	coloc.mapFile = params.imageFolder + "output.ply";
 
-	coloc.initMap(1.0);
+	coloc.initMap(15.0);
 
 	Pose3 pose;
 	Cov6 cov;
-	//coloc.imageNumber = 10;
-	//coloc.interPoseEstimator(0, 1, Pose3(Mat3::Identity(), Vec3::Zero()), pose, cov);
+	Plotter plotter;
+
+	plotter.plotScene(coloc.data.scene);
 	/*
-	
+	coloc.imageNumber = 10;
+	coloc.interPoseEstimator(0, 1, Pose3(Mat3::Identity(), Vec3::Zero()), pose, cov);	
 
 	std::vector <int> drones;
 	drones.push_back(2);
@@ -41,12 +43,7 @@ int main()
 	coloc.updateMap(drones);
 	
 	plotter.plotScene(coloc.data.scene);
-	*/
-
-	Pose3 poseIntra, poseInter;
-	Cov6 covIntra, covInter;
-
-	Plotter plotter;
+	
 	int droneId = 1;
 	coloc.imageNumber = 250;
 	for (int i = 250; i < 481; ++i) {
@@ -57,16 +54,16 @@ int main()
 			coloc.updateMap(drones);
 		}
 
-
 		coloc.intraPoseEstimator(droneId, poseIntra, covIntra);
 		plotter.plotPose(poseIntra);
 		coloc.imageNumber++;
 	}
 
-	//coloc.interPoseEstimator(0, 2, coloc.data.scene.poses.at(0), poseInter, covInter);
+	coloc.interPoseEstimator(0, 2, coloc.data.scene.poses.at(0), poseInter, covInter);
 	
-	//plotter.plotPoseandCovariance(poseIntra, covIntra);
-	//plotter.plotPoseandCovariance(poseInter, covInter);
+	plotter.plotPoseandCovariance(poseIntra, covIntra);
+	plotter.plotPoseandCovariance(poseInter, covInter);
+	*/
 	plotter.drawPlot();
 	
 	getchar();
