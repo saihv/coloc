@@ -34,6 +34,7 @@ namespace coloc
 	bool FeatureExtractor::detectFeatures(unsigned int index, FeatureMap &regions, std::string &imageName)
 	{
 		image::Image<unsigned char> imageGray;
+		std::cout << imageName << std::endl;
 
 		if (!ReadImage(imageName.c_str(), &imageGray)) {
 			std::cout << "Unable to read image from the given path." << std::endl;

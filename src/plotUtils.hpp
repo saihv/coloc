@@ -22,16 +22,17 @@ namespace coloc
 		}
 		bool plotScene(Scene& scene);
 		bool plotPoseandCovariance(Pose3& pose, Cov6& cov);
-		bool plotPose(Pose3& pose);
+		bool plotPose(Pose3& pose, uint8_t flag);
 		void drawPlot();
 
 	private:
 		bool plotLocation(Vec3& location, std::string& color);
-		bool plotOrientation(Mat3& rmat);
+		bool plotOrientation(Mat3& rmat, Vec3& pos, std::string& color);
 		bool plotMap(Scene& scene);
 
 		std::string seedPoseColor = "crimson";
-		std::string locPoseColor = "lime";
+		std::string intraLocPoseColor = "lime";
+		std::string interLocPoseColor = "crimson";
 		std::string mapColor = "midnightblue";
 	};
 
@@ -42,12 +43,44 @@ namespace coloc
 		command += ", ";
 		command += std::to_string(-1 * location[2]);
 		command += ", ";
-		command += std::to_string(-1 * location[1]);
+		command += std::to_string(location[1]);
 		command += ", ";
 		command += "s=20, c='" + color + "')";
 
 		PyRun_SimpleString(command.c_str());
 		return true;
+	}
+
+	bool Plotter::plotOrientation(Mat3& rmat, Vec3& pos, std::string& color)
+	{
+		Vec3 eulerAngles = rmat.eulerAngles(2, 1, 0);
+
+		float roll = eulerAngles[0];
+		float pitch = eulerAngles[1];
+		float yaw = eulerAngles[2];
+
+		float u = -sin(roll) * cos(yaw) - (cos(roll) * sin(pitch) * sin(yaw));
+		float v = sin(roll) * sin(yaw) - (cos(roll) * sin(pitch) * cos(yaw));
+		float w = cos(roll) * cos(pitch);
+
+		std::string command = "axes.quiver(";
+		command += std::to_string(-1 * pos[0]);
+		command += ", ";
+		command += std::to_string(-1 * pos[2]);
+		command += ", ";
+		command += std::to_string(pos[1]);
+		command += ", ";
+		command += std::to_string(u);
+		command += ", ";
+		command += std::to_string(v);
+		command += ", ";
+		command += std::to_string(w);
+		command += ", ";
+		command += "length=5, normalize=True)";
+
+		PyRun_SimpleString(command.c_str());
+		
+		return Success;
 	}
 
 	bool Plotter::plotMap(Scene& scene)
@@ -90,10 +123,13 @@ namespace coloc
 		return Success;
 	}
 
-	bool Plotter::plotPose(Pose3& pose)
+	bool Plotter::plotPose(Pose3& pose, uint8_t flag)
 	{
 		Vec3 position = pose.translation();
-		plotLocation(position, locPoseColor);
+		Mat3 rotation = pose.rotation();
+		flag ? plotLocation(position, interLocPoseColor) : plotLocation(position, intraLocPoseColor);
+		flag ? plotOrientation(rotation, position, interLocPoseColor) : plotOrientation(rotation, position, intraLocPoseColor);
+
 		return Success;
 	}
 
@@ -123,7 +159,7 @@ namespace coloc
 		PyRun_SimpleString(zLoc.c_str());
 		PyRun_SimpleString("axes.plot_surface(x, y, z,  rstride=4, cstride=4, color=None, alpha=0.2)");
 
-		plotLocation(position, locPoseColor);
+		plotLocation(position, intraLocPoseColor);
 
 		// std::cout << "Plotted pose and covariance" << std::endl;
 		return true;

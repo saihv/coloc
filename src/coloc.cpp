@@ -10,7 +10,7 @@ LocalizationParams initParams()
 	params.featureDetectorType = "BINARY";
 	params.imageSize = std::make_pair(640, 480);
 	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
-	params.imageFolder = "C:/Users/saihv/Desktop/testnewer/";
+	params.imageFolder = "C:/Users/saihv/Desktop/angleTest/";
 	params.filterType = 'H';
 	return params;
 }
@@ -25,14 +25,37 @@ int main()
 
 	coloc.poseFile = params.imageFolder + "poses.txt";
 	coloc.mapFile = params.imageFolder + "output.ply";
+	if (std::experimental::filesystem::exists(coloc.poseFile)) {
+		if (remove(coloc.poseFile.c_str()) == 0) {
+			std::cout << "Removed old log files" << std::endl;
+		}
+		else {
+			std::cout << "Can't remove old log files" << coloc.poseFile << ": "
+				<< strerror(errno) << std::endl;
 
-	coloc.initMap(15.0);
+			getchar();
+			return -1;
+		}
+	}
+
+	coloc.initMap(5.0);
 
 	Pose3 pose;
 	Cov6 cov;
 	Plotter plotter;
-
+	numDrones = 1;
 	plotter.plotScene(coloc.data.scene);
+	coloc.imageNumber = 1;
+	while (coloc.imageNumber < 61) {
+		for (int droneId = 0; droneId < numDrones; droneId++) {
+			Pose3 poseIntra;
+			Cov6 covIntra;
+			coloc.intraPoseEstimator(droneId, poseIntra, covIntra);
+			plotter.plotPose(poseIntra, 0);
+		}
+		coloc.imageNumber++;
+	}
+
 	/*
 	coloc.imageNumber = 10;
 	coloc.interPoseEstimator(0, 1, Pose3(Mat3::Identity(), Vec3::Zero()), pose, cov);	

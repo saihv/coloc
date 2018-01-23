@@ -85,7 +85,7 @@ namespace coloc
 			locStatus = localizer.localizeImage(fileName, pose, data, cov);
 
 		if (locStatus) {
-			logger.logPoseCovtoFile(droneId, droneId, pose, cov, poseFile);
+			logger.logPoseCovtoFile(imageNumber, droneId, droneId, pose, cov, poseFile);
 			logger.logPosetoPLY(pose, mapFile);
 		}
 	}
@@ -100,7 +100,7 @@ namespace coloc
 
 		LocalizationData tempScene;
 
-		for (unsigned int i = 0; i < numDrones; ++i) {
+		for (unsigned int i = 0; i < 2; ++i) {
 			detector.detectFeatures(i, tempScene.regions, filename[i]);
 			detector.saveFeatureData(i, tempScene.regions, filename[i]);
 
@@ -125,8 +125,13 @@ namespace coloc
 
 		PoseRefiner refiner;
 		const Optimize_Options refinementOptions(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::NONE);
-		refiner.refinePose(tempScene.scene, refinementOptions, cov);
+		bool locStatus = refiner.refinePose(tempScene.scene, refinementOptions, cov);
 		pose = tempScene.scene.poses.at(1);
+
+		if (locStatus) {
+			logger.logPoseCovtoFile(imageNumber, destId, sourceId, pose, cov, poseFile);
+			//logger.logPosetoPLY(pose, mapFile);
+		}
 	}
 
 	void ColoC::updateMap(std::vector <int> drones)

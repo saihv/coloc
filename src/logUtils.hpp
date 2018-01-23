@@ -12,10 +12,10 @@ namespace coloc
 	public:
 		bool logMaptoPLY(Scene& scene, std::string& filename);
 		bool logPosetoPLY(Pose3& pose, std::string& filename);
-		bool logPoseCovtoFile(int source, int dest, Pose3& pose, Cov6& cov, std::string& filename);
+		bool logPoseCovtoFile(int idx, int source, int dest, Pose3& pose, Cov6& cov, std::string& filename);
 	};
 
-	bool Logger::logPoseCovtoFile(int source, int dest, Pose3& pose, Cov6& cov, std::string& filename)
+	bool Logger::logPoseCovtoFile(int idx, int source, int dest, Pose3& pose, Cov6& cov, std::string& filename)
 	{
 		std::ofstream file;
 
@@ -27,8 +27,17 @@ namespace coloc
 		//make sure write fails with exception if something is wrong
 		file.exceptions(file.exceptions() | std::ios::failbit | std::ifstream::badbit);
 
-		file << dest << "," << source << "," << position[0] << "," << position[1] << "," << position[2] << ",";
-		file << cov.at(0)[21] << "," << cov.at(0)[28] << "," << cov.at(0)[35] << std::endl;
+		Vec3 eulerAngles = pose.rotation().eulerAngles(2, 1, 0);
+
+		float roll = eulerAngles[0] * 180 / M_PI;
+		float pitch = eulerAngles[1] * 180 / M_PI;
+		float yaw = eulerAngles[2] * 180 / M_PI;
+
+		file << idx << "," << dest << "," << source << "," << position[0] << "," << position[1] << "," << position[2] << ",";
+		file << cov.at(0)[21] << "," << cov.at(0)[22] << "," << cov.at(0)[23] << "," << 
+				cov.at(0)[27] << "," << cov.at(0)[28] << "," << cov.at(0)[29] << "," << 
+				cov.at(0)[33] << "," << cov.at(0)[34] << "," << cov.at(0)[35] << "," <<
+				roll << "," << pitch << "," << yaw << std::endl;
 
 		bool logStatus = file.good();
 		return logStatus;
