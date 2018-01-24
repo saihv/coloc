@@ -17,7 +17,6 @@ using namespace openMVG::features;
 using namespace openMVG::matching;
 using namespace openMVG::sfm;
 
-
 namespace coloc
 {
 	typedef std::vector<std::array<double, 6 * 6>> Cov6;

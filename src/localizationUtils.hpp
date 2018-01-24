@@ -134,8 +134,8 @@ namespace coloc
 
 	bool Utils::rescaleMap(Scene& scene, float scale)
 	{
-		for (unsigned int i = 0; i < scene.structure.size(); ++i) {
-			scene.structure[i].X = scene.structure.at(i).X * scale;
+		for (const auto & landmark : scene.GetLandmarks()) {
+			scene.structure.at(landmark.first).X = scene.structure.at(landmark.first).X * scale;
 		}
 
 		for (unsigned int i = 0; i < scene.poses.size(); ++i) {

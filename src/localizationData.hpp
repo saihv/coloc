@@ -137,11 +137,13 @@ namespace coloc
 
 			mapRegions.reset(mapFeatures.getRegionsType()->EmptyClone());
 			for (const auto & landmark : scene.GetLandmarks()) {
-				if (landmark.second.obs.at(0).id_feat != UndefinedIndexT) {
-					const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(0);
-					viewRegions->CopyRegion(landmark.second.obs.at(0).id_feat, mapRegions.get());
-					mapRegionIdx.push_back(landmark.first);
-				}
+				//for (const auto & observation : landmark.second.obs) {
+					if (landmark.second.obs.at(0).id_feat != UndefinedIndexT) {
+						const std::shared_ptr<features::Regions> viewRegions = mapFeatures.get(0);
+						viewRegions->CopyRegion(landmark.second.obs.at(0).id_feat, mapRegions.get());
+						mapRegionIdx.push_back(landmark.first);
+					}
+				//}
 			}
 			return Success;
 		}

@@ -27,7 +27,7 @@ endif(UNIX)
 
 find_package(OpenMVG REQUIRED)
 find_package(Threads REQUIRED)
-find_package(PythonLibs 2.7 REQUIRED)
+find_package(PythonLibs 3.6 REQUIRED)
 find_package(OpenMP)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")

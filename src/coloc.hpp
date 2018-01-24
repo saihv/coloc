@@ -159,9 +159,6 @@ namespace coloc
 		Reconstructor updateReconstructor(params);
 		updateReconstructor.reconstructScene(updateData, origin, 1.0, true);
 
-		std::string newMapFile = params.imageFolder + "newmap.ply";
-		logger.logMaptoPLY(updateData.scene, newMapFile);
-
 		bool newMapReady = updateData.setupFeatureDatabase(params);
 
 		if (newMapReady) {
@@ -171,6 +168,9 @@ namespace coloc
 			std::cout << "Scale factor ratio computed during update as " << scaleDiff << std::endl;
 			utils.rescaleMap(updateData.scene, scaleDiff);
 		}
+
+		std::string newMapFile = params.imageFolder + "newmap.ply";
+		logger.logMaptoPLY(updateData.scene, newMapFile);
 
 		data = updateData;
 		data.setupFeatureDatabase(params);

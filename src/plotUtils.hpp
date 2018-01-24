@@ -125,7 +125,7 @@ namespace coloc
 
 	bool Plotter::plotPose(Pose3& pose, uint8_t flag)
 	{
-		Vec3 position = pose.translation();
+		Vec3 position = pose.center();
 		Mat3 rotation = pose.rotation();
 		flag ? plotLocation(position, interLocPoseColor) : plotLocation(position, intraLocPoseColor);
 		flag ? plotOrientation(rotation, position, interLocPoseColor) : plotOrientation(rotation, position, intraLocPoseColor);
@@ -135,7 +135,7 @@ namespace coloc
 
 	bool Plotter::plotPoseandCovariance(Pose3& pose, Cov6& cov)
 	{
-		Vec3 position = pose.translation();
+		Vec3 position = pose.center();
 		
 		std::vector<double> positionCovariance;
 		positionCovariance.push_back(cov.at(0)[21]);
@@ -171,7 +171,7 @@ namespace coloc
 			Pose3 currentPose = pose.second;
 
 			Mat3 R = currentPose.rotation();
-			Vec3 t = currentPose.translation();
+			Vec3 t = currentPose.center();
 
 			plotLocation(t, seedPoseColor);
 			std::cout << "Plotting seed pose at " << t[0] << "," << t[1] << "," << t[2] << std::endl;

@@ -90,16 +90,22 @@ namespace coloc
 
 		initializeTracks(seedPair);
 		initializeScene(640, 480);
-		triangulatePoints(origin, scale);
+		std::cout << "Triangulating feature matches... ";
+ 		triangulatePoints(origin, scale);
+		std::cout << "Done." << std::endl;
+		
 		const Optimize_Options ba_refine_options
 		(cameras::Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::ADJUST_ALL);
 		std::string initialMap = "initial.ply";
 		std::string refinedMap = "refined.ply";
 		saveSceneData(this->scene, initialMap);
+		std::cout << "Refining scene...";
 		if(Adjust)
 			refiner.refinePose(*scene, ba_refine_options);
-		//resectionCamera(2);
-		saveSceneData(this->scene, refinedMap);
+		std::cout << "Done." << std::endl;
+		// resectionCamera(2);
+
+		//saveSceneData(this->scene, refinedMap);
 	}
 	
 	void Reconstructor::initializeTracks(Pair& viewPair)
