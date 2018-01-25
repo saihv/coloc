@@ -48,6 +48,10 @@
 #include "localizationParams.hpp"
 #include "localizationData.hpp"
 
+#include "opencv2/calib3d.hpp"
+#include "opencv2/core.hpp"
+#include "opencv2/core/eigen.hpp"
+
 using namespace openMVG::cameras;
 using namespace openMVG::geometry;
 using namespace openMVG::matching_image_collection;
@@ -85,35 +89,133 @@ namespace coloc
 			const IntrinsicBase * intrinsics2,
 			const Mat & x1,
 			const Mat & x2,
-			RelativePose_Info & relativePose_info, LocalizationParams& params);
+			RelativePose_Info & relativePose_info, LocalizationParams& params,
+			bool findPose);
 		bool filterEssential(const IntrinsicBase * intrinsics1,
 			const IntrinsicBase * intrinsics2,
 			const Mat & x1,
 			const Mat & x2,
-			RelativePose_Info & relativePose_info, LocalizationParams& params);
+			RelativePose_Info & relativePose_info, LocalizationParams& params,
+			bool findPose);
+		bool decomposeHomography(Mat3& H, std::vector <Pose3> & motions);
+		bool performChiralityTest
+		(
+			const Mat3X & x1,
+			const Mat3X & x2,
+			const Mat3 & E,
+			const std::vector<uint32_t> & bearing_vector_index_to_use,
+			std::vector <Pose3> relative_poses,
+			Pose3 * final_pose,
+			std::vector<uint32_t> * vec_selected_points = nullptr,
+			std::vector<Vec3> * vec_points = nullptr,
+			const double positive_depth_solution_ratio = 0.7
+		);
 	};
 
-	bool RobustMatcher::filterEssential
-	(
-		const IntrinsicBase * intrinsics1,
-		const IntrinsicBase * intrinsics2,
-		const Mat & x1,
-		const Mat & x2,
-		RelativePose_Info & relativePose_info,
-		LocalizationParams& params
-	)
+	bool RobustMatcher::performChiralityTest(const Mat3X & x1,
+		const Mat3X & x2,
+		const Mat3 & E,
+		const std::vector<uint32_t> & bearing_vector_index_to_use,
+		std::vector <Pose3> relative_poses,
+		Pose3 * final_pose,
+		std::vector<uint32_t> * vec_selected_points,
+		std::vector<Vec3> * vec_points,
+		const double positive_depth_solution_ratio)
+	{
+		std::vector<uint32_t> cheirality_accumulator(relative_poses.size(), 0);
+
+		// Find which solution is the best:
+		// - count how many triangulated observations are in front of the cameras
+		std::vector<std::vector<uint32_t>> vec_newInliers(relative_poses.size());
+		std::vector<std::vector<Vec3>> vec_3D(relative_poses.size());
+
+		const Pose3 pose1(Mat3::Identity(), Vec3::Zero());
+		const Mat34 P1 = pose1.asMatrix();
+
+		for (size_t i = 0; i < relative_poses.size(); ++i)
+		{
+			const Pose3 pose2 = relative_poses[i];
+			const Mat34 P2 = pose2.asMatrix();
+			Vec3 X;
+
+			for (const uint32_t inlier_idx : bearing_vector_index_to_use)
+			{
+				const auto
+					f1 = x1.col(inlier_idx),
+					f2 = x2.col(inlier_idx);
+				TriangulateDLT(P1, f1, P2, f2, &X);
+				// Test if X is visible by the two cameras
+				if (CheiralityTest(f1, pose1, f2, pose2, X))
+				{
+					++cheirality_accumulator[i];
+					vec_newInliers[i].push_back(inlier_idx);
+					vec_3D[i].push_back(X);
+				}
+			}
+		}
+
+		// Check if there is a valid solution:
+		const auto iter = std::max_element(cheirality_accumulator.cbegin(), cheirality_accumulator.cend());
+		if (*iter == 0)
+		{
+			// There is no right solution with points in front of the cameras
+			return false;
+		}
+
+		// Export the best solution data
+		const size_t index = std::distance(cheirality_accumulator.cbegin(), iter);
+		if (final_pose)
+		{
+			(*final_pose) = relative_poses[index];
+		}
+		if (vec_selected_points)
+			(*vec_selected_points) = vec_newInliers[index];
+		if (vec_points)
+			(*vec_points) = vec_3D[index];
+
+		// Test if the best solution is good by using the ratio of the two best solution score
+		std::sort(cheirality_accumulator.begin(), cheirality_accumulator.end());
+		const double ratio = cheirality_accumulator.rbegin()[1]
+			/ static_cast<double>(cheirality_accumulator.rbegin()[0]);
+		return (ratio < positive_depth_solution_ratio);
+	}
+
+	bool RobustMatcher::decomposeHomography(Mat3& H, std::vector <Pose3> & motions)
+	{
+		cv::Mat Homography(3, 3, CV_64FC1), intrinsics(3,3, CV_64FC1);
+		std::vector<cv::Mat> r, t, n, m;
+		cv::eigen2cv(H, Homography);
+		cv::eigen2cv(params->K, intrinsics);
+		cv::decomposeHomographyMat(Homography, intrinsics, r, t, n);
+
+		for (size_t i = 0; i < r.size(); ++i) {
+			Mat3 Rot;
+			Vec3 trn;
+
+			cv::cv2eigen(r[i], Rot);
+			trn[0] = t[i].at<double>(0, 0);
+			trn[1] = t[i].at<double>(1, 0);
+			trn[2] = t[i].at<double>(2, 0);
+
+			motions.emplace_back(Rot, trn.normalized());
+		}
+		return Success;
+	}
+
+	bool RobustMatcher::filterEssential(const IntrinsicBase * intrinsics1, const IntrinsicBase * intrinsics2, const Mat & x1, const Mat & x2,
+										RelativePose_Info & relativePose_info, LocalizationParams& params, bool findPose)
 	{
 		if (!intrinsics1 || !intrinsics2)
 			return Failure;
 
-		const Mat3X bearing1 = (*intrinsics1)(x1), bearing2 = (*intrinsics2)(x2);
+		const Mat3X norm2Dpt_1 = (*intrinsics1)(x1), norm2Dpt_2 = (*intrinsics2)(x2);
 
 		using KernelType = robust::ACKernelAdaptorEssential<
 			openMVG::essential::kernel::FivePointSolver,
 			openMVG::fundamental::kernel::EpipolarDistanceError,
 			Mat3>;
-		KernelType kernel(x1, bearing1, params.imageSize.first, params.imageSize.second,
-			x2, bearing2, params.imageSize.first, params.imageSize.second,
+		KernelType kernel(x1, norm2Dpt_1, params.imageSize.first, params.imageSize.second,
+			x2, norm2Dpt_2, params.imageSize.first, params.imageSize.second,
 			dynamic_cast<const cameras::Pinhole_Intrinsic*>(intrinsics1)->K(),
 			dynamic_cast<const cameras::Pinhole_Intrinsic*>(intrinsics2)->K());
 
@@ -125,26 +227,26 @@ namespace coloc
 		if (relativePose_info.vec_inliers.size() < 2.5 * KernelType::Solver::MINIMUM_SAMPLES)
 			return Failure;
 
-		Pose3 relative_pose;
-		if (!RelativePoseFromEssential(bearing1, bearing2, relativePose_info.essential_matrix, relativePose_info.vec_inliers, &relative_pose))
-			return Failure;
-		
-		relativePose_info.relativePose = relative_pose;
+		if (findPose) {
+			Pose3 relative_pose;
+			if (!RelativePoseFromEssential(norm2Dpt_1, norm2Dpt_2, relativePose_info.essential_matrix, relativePose_info.vec_inliers, &relative_pose))
+				return Failure;
+
+			relativePose_info.relativePose = relative_pose;
+		}
 		return Success;
 	}
 
-	bool RobustMatcher::filterHomography(
-		const IntrinsicBase * intrinsics1,
-		const IntrinsicBase * intrinsics2,
-		const Mat & x1,
-		const Mat & x2,
-		RelativePose_Info & relativePose_info, LocalizationParams& params)
+	bool RobustMatcher::filterHomography(const IntrinsicBase * intrinsics1,	const IntrinsicBase * intrinsics2, const Mat & x1, const Mat & x2,
+										RelativePose_Info & relativePose_info, LocalizationParams& params, bool findPose)
 	{
 		using KernelType = robust::ACKernelAdaptor<
 			openMVG::homography::kernel::FourPointSolver,
 			openMVG::homography::kernel::AsymmetricError,
 			UnnormalizerI,
 			Mat3>;
+
+		const Mat3X normpt2D_1 = (*intrinsics1)(x1), normpt2D_2 = (*intrinsics2)(x2);
 
 		KernelType kernel(
 			x1, params.imageSize.first, params.imageSize.second,
@@ -160,15 +262,14 @@ namespace coloc
 		else {
 			relativePose_info.found_residual_precision = ACRansacOut.first;
 
-			Vec3 t = relativePose_info.essential_matrix.col(2).normalized();	
-			Mat3 R;
+			if (findPose) {
+				std::vector <Pose3> motions;
+				decomposeHomography(relativePose_info.essential_matrix, motions);
+				Pose3 final_pose;
 
-			R.col(0) = relativePose_info.essential_matrix.col(0).normalized();
-			R.col(1) = relativePose_info.essential_matrix.col(1).normalized();
-			R.col(2) = R.col(0).cross(R.col(1));
-
-			relativePose_info.relativePose = Pose3(R, -R.transpose()*t);
-			return Success;
+				performChiralityTest(normpt2D_1, normpt2D_2, relativePose_info.essential_matrix, relativePose_info.vec_inliers, motions, &final_pose);
+				relativePose_info.relativePose = final_pose;					
+			}
 		}		
 		return Success;
 	}
@@ -199,12 +300,12 @@ namespace coloc
 			camL(params->imageSize.first, params->imageSize.second, (params->K)(0, 0), (params->K)(0, 2), (params->K)(1, 2)),
 			camR(params->imageSize.first, params->imageSize.second, (params->K)(0, 0), (params->K)(0, 2), (params->K)(1, 2));
 
-		bool status;
+		bool status, findPose = false;
 
 		if (params->filterType == 'H')
-			status = filterHomography(&camL, &camR, xL, xR, relativePose, *params);
+			status = filterHomography(&camL, &camR, xL, xR, relativePose, *params, findPose);
 		else if (params->filterType == 'E')
-			status = filterEssential(&camL, &camR, xL, xR, relativePose, *params);
+			status = filterEssential(&camL, &camR, xL, xR, relativePose, *params, findPose);
 		else {
 			std::cout << "Unknown filtering type: aborting." << std::endl;
 			return Failure;
@@ -239,12 +340,12 @@ namespace coloc
 			camL(params->imageSize.first, params->imageSize.second, (params->K)(0, 0), (params->K)(0, 2), (params->K)(1, 2)),
 			camR(params->imageSize.first, params->imageSize.second, (params->K)(0, 0), (params->K)(0, 2), (params->K)(1, 2));
 
-		bool status;
+		bool status, findPose = true;
 
 		if (params->filterType == 'H')
-			status = filterHomography(&camL, &camR, xL, xR, relativePose, *params);
+			status = filterHomography(&camL, &camR, xL, xR, relativePose, *params, findPose);
 		else if (params->filterType == 'E')
-			status = filterEssential(&camL, &camR, xL, xR, relativePose, *params);
+			status = filterEssential(&camL, &camR, xL, xR, relativePose, *params, findPose);
 		else {
 			std::cout << "Unknown filtering type: aborting." << std::endl;
 			return Failure;

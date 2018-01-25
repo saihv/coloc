@@ -11,6 +11,8 @@
 #include "plotUtils.hpp"
 #include "logUtils.hpp"
 #include <filesystem>
+#include <chrono>
+#include <ctime>
 
 namespace coloc
 {
@@ -27,7 +29,7 @@ namespace coloc
 		}
 		void intraPoseEstimator(int& droneId, Pose3& pose, Cov6& cov);
 		void interPoseEstimator(int sourceId, int destId, Pose3& origin, Pose3& pose, Cov6& cov);
-		void initMap(float scale);
+		void initMap(std::vector <int> droneIds, float scale);
 		void updateMap(std::vector <int> drones);
 
 		LocalizationData data;
@@ -48,12 +50,13 @@ namespace coloc
 		bool mapReady;
 	};
 
-	void ColoC::initMap(float scale = 1.0)
+	void ColoC::initMap(std::vector <int> droneIds, float scale = 1.0)
 	{
 		std::string filename;
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
-		for (unsigned int i = 0; i < numDrones; ++i) {
-			filename = params.imageFolder + "img__Quad" + std::to_string(i) + "_" + number + ".png";
+		auto start = std::chrono::system_clock::now();
+		for (unsigned int i = 0; i < droneIds.size(); ++i) {
+			filename = params.imageFolder + "img__Quad" + std::to_string(droneIds[i]) + "_" + number + ".png";
 			std::cout << filename << std::endl;
 
 			detector.detectFeatures(i, data.regions, filename);
@@ -61,22 +64,41 @@ namespace coloc
 
 			data.scene.views[i].reset(new View(filename, i, 0, i, params.imageSize.first, params.imageSize.second));
 		}
+		auto end = std::chrono::system_clock::now();
 
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+		std::cout << "Feature detection took "  << elapsed_seconds.count() << "s\n";
+
+		start = std::chrono::system_clock::now();
 		matcher.computeMatches(data.regions, data.putativeMatches);
 		robustMatcher.filterMatches(data.regions, data.putativeMatches, data.geometricMatches, data.relativePoses);
+		end = std::chrono::system_clock::now();
 
+		elapsed_seconds = end - start;
+		end_time = std::chrono::system_clock::to_time_t(end);
+		std::cout << "Feature matching took " << elapsed_seconds.count() << "s\n";
 		Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
-
+		start = std::chrono::system_clock::now();
 		std::cout << "Updating map" << std::endl;
 		reconstructor.reconstructScene(data, origin, scale, true);
-
+		end = std::chrono::system_clock::now();
+		elapsed_seconds = end - start;
+		end_time = std::chrono::system_clock::to_time_t(end);
+		std::cout << "Reconstruction took " << elapsed_seconds.count() << "s\n";
 		logger.logMaptoPLY(data.scene, mapFile);
 		data.scene.s_root_path = params.imageFolder;
+		start = std::chrono::system_clock::now();
 		mapReady = data.setupFeatureDatabase(params);
+		end = std::chrono::system_clock::now();
+		elapsed_seconds = end - start;
+		end_time = std::chrono::system_clock::to_time_t(end);
+		std::cout << "Database setup took " << elapsed_seconds.count() << "s\n";
 	}
 
 	void ColoC::intraPoseEstimator(int& droneId, Pose3& pose, Cov6& cov)
 	{
+		auto start = std::chrono::system_clock::now();
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 		std::string fileName = params.imageFolder + "img__Quad" + std::to_string(droneId) + "_" + number + ".png";
 		bool locStatus = false;
@@ -88,10 +110,16 @@ namespace coloc
 			logger.logPoseCovtoFile(imageNumber, droneId, droneId, pose, cov, poseFile);
 			logger.logPosetoPLY(pose, mapFile);
 		}
+
+		auto end = std::chrono::system_clock::now();
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+		std::cout << "Intra estimation took " << elapsed_seconds.count() << "s\n";
 	}
 
 	void ColoC::interPoseEstimator(int sourceId, int destId, Pose3& origin, Pose3& pose, Cov6& cov)
 	{
+		auto start = std::chrono::system_clock::now();
 		std::vector <std::string> filename;
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 
@@ -132,6 +160,11 @@ namespace coloc
 			logger.logPoseCovtoFile(imageNumber, destId, sourceId, pose, cov, poseFile);
 			//logger.logPosetoPLY(pose, mapFile);
 		}
+
+		auto end = std::chrono::system_clock::now();
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+		std::cout << "Inter estimation took " << elapsed_seconds.count() << "s\n";
 	}
 
 	void ColoC::updateMap(std::vector <int> drones)

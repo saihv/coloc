@@ -66,10 +66,7 @@ namespace coloc
 	public:
 		float computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures);
 		bool matchSceneWithMap(Scene& scene);
-		bool setupMap(LocalizationData&, LocalizationParams&);
-		bool initMapMatchingInterface(LocalizationData &data, Regions_Provider &mapFeatures);
 		bool rescaleMap(Scene& scene, float scale);
-
 		int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 		bool drawMatches(std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches);
 	private:
@@ -80,18 +77,10 @@ namespace coloc
 
 	bool Utils::drawMatches(std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches)
 	{
-		Matches2SVG
-		(
-			image1,
-			{ 640, 480 },
-			regions1.GetRegionsPositions(),
-			image2,
-			{ 640, 480 },
-			regions2.GetRegionsPositions(),
-			matches,
-			outputFilename,
-			false
-		);
+		Matches2SVG	(
+			image1,	{ 640, 480 }, regions1.GetRegionsPositions(),
+			image2,	{ 640, 480 }, regions2.GetRegionsPositions(),
+			matches, outputFilename, false);
 		return Success;
 	}
 

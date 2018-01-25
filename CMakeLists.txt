@@ -18,6 +18,7 @@ endif()
 
 if(MSVC)
     set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install/share/openMVG/cmake")
+    set(OpenCV_DIR "D:/Code/Libraries/opencv-3.4.0/opencv-3.4.0/build/install_release")
     set(PYTHON_LIBRARY "C:/Python27/libs/python27.lib")
     set(PYTHON_INCLUDE_DIR "C:/Python27/include;C:/Python27/Lib/site-packages/numpy/core/include")
 endif(MSVC)
@@ -33,12 +34,14 @@ if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif(OPENMP_FOUND)
+find_package(OpenCV REQUIRED)
 
 include_directories(
     ${OPENMVG_INCLUDE_DIRS}
     ${Eigen_INCLUDE_DIRS} 
     ${CERES_INCLUDE_DIRS}
-    ${PYTHON_INCLUDE_DIRS}    
+    ${PYTHON_INCLUDE_DIRS}
+    ${OPENCV_INCLUDE_DIRS}    
 )
 
 file(
@@ -65,19 +68,5 @@ target_link_libraries(coloc
   stlplus
   easyexif
   vlsift
-  ${PYTHON_LIBRARIES})
-
-add_executable(updatetest src/updatetest.cpp)
-target_link_libraries(updatetest
-  openMVG_system
-  openMVG_image
-  openMVG_features
-  openMVG_multiview
-  openMVG_matching_image_collection
-  openMVG_sfm
-  openMVG_geometry
-  ceres
-  stlplus
-  easyexif
-  vlsift
-  ${PYTHON_LIBRARIES})
+  ${PYTHON_LIBRARIES}
+  ${OpenCV_LIBS})
