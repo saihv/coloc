@@ -81,7 +81,7 @@ namespace coloc
 	private:
 		FeatureMap featureRegions;
 		std::pair<size_t, size_t> *imageSize;
-		int iterationCount = 1024;
+		int iterationCount = 4096;
 		Mat3 *K;
 		LocalizationParams *params;
 
@@ -268,7 +268,21 @@ namespace coloc
 				Pose3 final_pose;
 
 				performChiralityTest(normpt2D_1, normpt2D_2, relativePose_info.essential_matrix, relativePose_info.vec_inliers, motions, &final_pose);
-				relativePose_info.relativePose = final_pose;					
+				relativePose_info.relativePose = final_pose;	
+
+				std::cout << final_pose.center() << std::endl;
+				
+				relativePose_info.found_residual_precision = ACRansacOut.first;
+				/*
+				Vec3 t = relativePose_info.essential_matrix.col(2).normalized();
+				Mat3 R;
+
+				R.col(0) = relativePose_info.essential_matrix.col(0).normalized();
+				R.col(1) = relativePose_info.essential_matrix.col(1).normalized();
+				R.col(2) = R.col(0).cross(R.col(1));
+
+				relativePose_info.relativePose = Pose3(R, -R.transpose()*t);
+				*/
 			}
 		}		
 		return Success;

@@ -52,17 +52,17 @@ namespace coloc
 
 	void ColoC::initMap(std::vector <int> droneIds, float scale = 1.0)
 	{
-		std::string filename;
+		std::vector <std::string> filename;
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 		auto start = std::chrono::system_clock::now();
 		for (unsigned int i = 0; i < droneIds.size(); ++i) {
-			filename = params.imageFolder + "img__Quad" + std::to_string(droneIds[i]) + "_" + number + ".png";
-			std::cout << filename << std::endl;
+			filename.push_back(params.imageFolder + "img__Quad" + std::to_string(droneIds[i]) + "_" + number + ".png");
+			std::cout << filename[i] << std::endl;
 
-			detector.detectFeatures(i, data.regions, filename);
-			detector.saveFeatureData(i, data.regions, filename);
+			detector.detectFeatures(i, data.regions, filename[i]);
+			detector.saveFeatureData(i, data.regions, filename[i]);
 
-			data.scene.views[i].reset(new View(filename, i, 0, i, params.imageSize.first, params.imageSize.second));
+			data.scene.views[i].reset(new View(filename[i], i, 0, i, params.imageSize.first, params.imageSize.second));
 		}
 		auto end = std::chrono::system_clock::now();
 
@@ -78,6 +78,8 @@ namespace coloc
 		elapsed_seconds = end - start;
 		end_time = std::chrono::system_clock::to_time_t(end);
 		std::cout << "Feature matching took " << elapsed_seconds.count() << "s\n";
+		std::string matchesFile = "matches.svg";
+		utils.drawMatches(matchesFile, filename[0], filename[1], *data.regions[0].get(), *data.regions[1].get(), data.geometricMatches.at({ 0,1 }));
 		Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
 		start = std::chrono::system_clock::now();
 		std::cout << "Updating map" << std::endl;
@@ -102,12 +104,13 @@ namespace coloc
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 		std::string fileName = params.imageFolder + "img__Quad" + std::to_string(droneId) + "_" + number + ".png";
 		bool locStatus = false;
+		float rmse;
 
 		if (mapReady)
-			locStatus = localizer.localizeImage(fileName, pose, data, cov);
+			locStatus = localizer.localizeImage(fileName, pose, data, cov, rmse);
 
 		if (locStatus) {
-			logger.logPoseCovtoFile(imageNumber, droneId, droneId, pose, cov, poseFile);
+			logger.logPoseCovtoFile(imageNumber, droneId, droneId, pose, cov, rmse, poseFile);
 			logger.logPosetoPLY(pose, mapFile);
 		}
 
@@ -121,6 +124,7 @@ namespace coloc
 	{
 		auto start = std::chrono::system_clock::now();
 		std::vector <std::string> filename;
+		std::string matchesFile = "matches.svg";
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 
 		filename.push_back(params.imageFolder + "img__Quad" + std::to_string(sourceId) + "_" + number + ".png");
@@ -138,27 +142,37 @@ namespace coloc
 		matcher.computeMatches(tempScene.regions, tempScene.putativeMatches);
 		robustMatcher.filterMatches(tempScene.regions, tempScene.putativeMatches, tempScene.geometricMatches, tempScene.relativePoses);
 
-		std::cout << "Updating map" << std::endl;
+		utils.drawMatches(matchesFile, filename[0], filename[1], *tempScene.regions[0].get(), *tempScene.regions[1].get(), tempScene.geometricMatches.at({ 0,1 }));
+
+		std::cout << "Creating temporary map" << std::endl;
 		coloc::Reconstructor tempReconstructor(params);
 		coloc::Utils tempUtils;
 		tempReconstructor.reconstructScene(tempScene, origin, 1.0, false);
+
+		PoseRefiner refiner;
+		float rmse;
+		const Optimize_Options refinementOptions(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::NONE);
+		bool locStatus = refiner.refinePose(tempScene.scene, refinementOptions, rmse, cov);
 
 		tempScene.scene.s_root_path = params.imageFolder;
 		mapReady = tempScene.setupFeatureDatabase(params);
 
 		std::vector <IndMatch> commonFeatures;
 		robustMatcher.matchMaps(data, tempScene, commonFeatures);
-		float scaleDiff = utils.computeScaleDifference(params, data, tempScene, commonFeatures);
+
+		utils.drawMatches(matchesFile, filename[0], filename[0], *data.mapRegions.get(), *tempScene.mapRegions.get(), commonFeatures);
+		double scaleDiff = utils.computeScaleDifference(params, data, tempScene, commonFeatures);
+
+		std::cout << "Found scale difference to be " << scaleDiff << std::endl;
 		utils.rescaleMap(tempScene.scene, scaleDiff);
 
-		PoseRefiner refiner;
-		const Optimize_Options refinementOptions(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::NONE);
-		bool locStatus = refiner.refinePose(tempScene.scene, refinementOptions, cov);
 		pose = tempScene.scene.poses.at(1);
+		std::string newMapFile = params.imageFolder + "newmap.ply";
 
 		if (locStatus) {
-			logger.logPoseCovtoFile(imageNumber, destId, sourceId, pose, cov, poseFile);
-			//logger.logPosetoPLY(pose, mapFile);
+			logger.logPoseCovtoFile(imageNumber, destId, sourceId, pose, cov, rmse, poseFile);
+			//logger.logPosetoPLY(pose, newMapFile);
+			//logger.logMaptoPLY(tempScene.scene, newMapFile);
 		}
 
 		auto end = std::chrono::system_clock::now();
@@ -197,7 +211,7 @@ namespace coloc
 		if (newMapReady) {
 			std::vector <IndMatch> commonFeatures;
 			robustMatcher.matchMaps(data, updateData, commonFeatures);
-			float scaleDiff = utils.computeScaleDifference(params, data, updateData, commonFeatures);
+			double scaleDiff = utils.computeScaleDifference(params, data, updateData, commonFeatures);
 			std::cout << "Scale factor ratio computed during update as " << scaleDiff << std::endl;
 			utils.rescaleMap(updateData.scene, scaleDiff);
 		}

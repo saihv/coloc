@@ -39,9 +39,9 @@ namespace coloc
 	bool Plotter::plotLocation(Vec3& location, std::string& color)
 	{
 		std::string command = "axes.scatter(";
-		command += std::to_string(-1 * location[0]);
+		command += std::to_string(location[0]);
 		command += ", ";
-		command += std::to_string(-1 * location[2]);
+		command += std::to_string(location[2]);
 		command += ", ";
 		command += std::to_string(location[1]);
 		command += ", ";
@@ -64,9 +64,9 @@ namespace coloc
 		float w = cos(roll) * cos(pitch);
 
 		std::string command = "axes.quiver(";
-		command += std::to_string(-1 * pos[0]);
+		command += std::to_string(pos[0]);
 		command += ", ";
-		command += std::to_string(-1 * pos[2]);
+		command += std::to_string(pos[2]);
 		command += ", ";
 		command += std::to_string(pos[1]);
 		command += ", ";

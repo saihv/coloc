@@ -47,7 +47,7 @@ namespace coloc
 	{
 	public:
 		bool refinementOptions(bool verbose);
-		bool refinePose(SfM_Data& scene, const Optimize_Options options, Cov6& poseCovariance);
+		bool refinePose(SfM_Data& scene, const Optimize_Options options, float& rmse, Cov6& poseCovariance);
 
 	private:
 		struct CeresOptions
@@ -63,7 +63,7 @@ namespace coloc
 		}ceresOptions;
 	};
 
-	bool PoseRefiner::refinePose(SfM_Data &scene, const Optimize_Options options, std::vector<std::array<double, 6 * 6> > &poseCovariance = std::vector<std::array<double, 36> >())
+	bool PoseRefiner::refinePose(SfM_Data &scene, const Optimize_Options options, float& rmse, std::vector<std::array<double, 6 * 6> > &poseCovariance = std::vector<std::array<double, 36> >())
 	{
 		ceres::Problem problem;
 
@@ -87,8 +87,38 @@ namespace coloc
 
 			double angleAxis[3];
 			ceres::RotationMatrixToAngleAxis((const double*)R.data(), angleAxis);
+
+			float a1, a2, a3;
+			Vec3 angles = R.eulerAngles(2, 1, 0);
+
+			a1 = angles[0] * 180 / M_PI;
+			a2 = angles[2] * 180 / M_PI;
+			a3 = angles[1] * 180 / M_PI;
+			if (abs(a2) > 120) {
+				if (a2 < 0)
+					a2 = (-1 * a2 - 180);
+				else
+					a2 = 180 - a2;
+			}
+
+			if (abs(a3) > 120) {
+				if (a3 < 0)
+					a3 = 180 + a3;
+				else
+					a3 = a3 - 180;
+			}
+			else
+				a3 = -1 * a3;
+
+			if (abs(a1) > 120) {
+				if (a3 < 0)
+					a3 = 180 + a3;
+				else
+					a3 = a3 - 180;
+			}
+
 			// angleAxis + translation
-			mapPoses[poseIdx] = { angleAxis[0], angleAxis[1], angleAxis[2], t(0), t(1), t(2) };
+			mapPoses[poseIdx] = { a1, a2, a3, t(0), t(1), t(2) };
 
 			double * parameter_block = &mapPoses[poseIdx][0];
 			poseParameter.push_back(parameter_block);
@@ -226,6 +256,8 @@ namespace coloc
 					<< " Time (s): " << summary.total_time_in_seconds << "\n"
 					<< std::endl;
 			}
+
+			rmse = (float)std::sqrt(summary.final_cost / summary.num_residuals);
 
 			// Update camera poses with refined data
 			if (options.extrinsics_opt != Extrinsic_Parameter_Type::NONE) {

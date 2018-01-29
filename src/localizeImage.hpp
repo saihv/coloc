@@ -43,9 +43,9 @@ namespace coloc
 		}
 
 		std::unique_ptr<features::Regions> regionsCurrent;
-		bool localizeImage(std::string&, Pose3&, LocalizationData&, Cov6&);
+		bool localizeImage(std::string&, Pose3&, LocalizationData&, Cov6&, float&);
 		bool matchSceneWithMap(IntrinsicBase* cam, LocalizationData &data, const features::Regions & queryRegions, Image_Localizer_Match_Data * trackPtr);
-		bool refine(Pose3&, Image_Localizer_Match_Data&, Cov6&);
+		bool refine(Pose3&, Image_Localizer_Match_Data&, Cov6&, float&);
 		
 	private:
 		std::unique_ptr<features::Image_describer> image_describer;
@@ -111,7 +111,7 @@ namespace coloc
 		return Success;
 	}
 	
-	bool Localizer::localizeImage(std::string& imageName, Pose3& pose, LocalizationData &data, Cov6 &covariance)
+	bool Localizer::localizeImage(std::string& imageName, Pose3& pose, LocalizationData &data, Cov6 &covariance, float& rmse)
 	{
 		using namespace openMVG::features;
 		openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
@@ -141,7 +141,7 @@ namespace coloc
 			else {
 				std::cout << "Localization successful" << std::endl;
 
-				if (!this->refine(pose, matching_data, covariance))
+				if (!this->refine(pose, matching_data, covariance, rmse))
 					std::cerr << "Refining pose for image failed." << std::endl;
 
 				return Success;
@@ -150,7 +150,7 @@ namespace coloc
 
 	}
 
-	bool Localizer::refine(Pose3 &pose, Image_Localizer_Match_Data& matchData, Cov6 &poseCovariance)
+	bool Localizer::refine(Pose3 &pose, Image_Localizer_Match_Data& matchData, Cov6 &poseCovariance, float& rmse)
 	{
 		Scene scene;
 		scene.views.insert({ 0, std::make_shared<View>("",0, 0, 0) });
@@ -172,7 +172,7 @@ namespace coloc
 		PoseRefiner refiner;
 		const bool refineStatus = refiner.refinePose(
 			scene,
-			ba_refine_options, poseCovariance);
+			ba_refine_options, rmse, poseCovariance);
 		if (refineStatus)
 			pose = scene.poses[0];
 		

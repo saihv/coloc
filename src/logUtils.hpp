@@ -12,7 +12,7 @@ namespace coloc
 	public:
 		bool logMaptoPLY(Scene& scene, std::string& filename);
 		bool logPosetoPLY(Pose3& pose, std::string& filename);
-		bool logPoseCovtoFile(int idx, int source, int dest, Pose3& pose, Cov6& cov, std::string& filename);
+		bool logPoseCovtoFile(int idx, int source, int dest, Pose3& pose, Cov6& cov, float& rmse, std::string& filename);
 
 	private:
 		void convertAnglesForLogging(Vec3& angles);
@@ -41,12 +41,19 @@ namespace coloc
 		else
 			a3 = -1 * a3;
 
+		if (abs(a1) > 120) {
+			if (a3 < 0)
+				a3 = 180 + a3;
+			else
+				a3 = a3 - 180;
+		}
+
 		angles[0] = a1 * M_PI / 180;
 		angles[1] = a2 * M_PI / 180;
 		angles[2] = a3 * M_PI / 180;
 	}
 
-	bool Logger::logPoseCovtoFile(int idx, int source, int dest, Pose3& pose, Cov6& cov, std::string& filename)
+	bool Logger::logPoseCovtoFile(int idx, int source, int dest, Pose3& pose, Cov6& cov, float& rmse, std::string& filename)
 	{
 		std::ofstream file;
 
@@ -77,7 +84,7 @@ namespace coloc
 			 << cov.at(0)[21] << "," << cov.at(0)[22] << "," << cov.at(0)[23] << ","  
 			 << cov.at(0)[27] << "," << cov.at(0)[28] << "," << cov.at(0)[29] << ","  
 		     << cov.at(0)[33] << "," << cov.at(0)[34] << "," << cov.at(0)[35] << "," 
-			 <<	roll << "," << pitch << "," << yaw << std::endl;
+			 <<	roll << "," << pitch << "," << yaw << "," << rmse << std::endl;
 
 		bool logStatus = file.good();
 		return logStatus;

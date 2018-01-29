@@ -64,9 +64,9 @@ namespace coloc
 	class Utils
 	{
 	public:
-		float computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures);
+		double computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures);
 		bool matchSceneWithMap(Scene& scene);
-		bool rescaleMap(Scene& scene, float scale);
+		bool rescaleMap(Scene& scene, double scale);
 		int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
 		bool drawMatches(std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches);
 	private:
@@ -80,11 +80,11 @@ namespace coloc
 		Matches2SVG	(
 			image1,	{ 640, 480 }, regions1.GetRegionsPositions(),
 			image2,	{ 640, 480 }, regions2.GetRegionsPositions(),
-			matches, outputFilename, false);
+			matches, outputFilename, true);
 		return Success;
 	}
 
-	float Utils::computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures)
+	double Utils::computeScaleDifference(LocalizationParams& params, LocalizationData &data1, LocalizationData &data2, std::vector<IndMatch> commonFeatures)
 	{
 		if (commonFeatures.empty()) {
 			std::cout << "No common features between the maps." << std::endl;
@@ -98,7 +98,7 @@ namespace coloc
 		pt3D_1.resize(3, commonFeatures.size());
 		pt3D_2.resize(3, commonFeatures.size());
 
-		float scale = 0.0, scaleDiff = 1.0;
+		double scale = 0.0, scaleDiff = 1.0;
 
 		for (size_t i = 0; i < commonFeatures.size(); ++i) {
 			pt3D_1.col(i) = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
@@ -117,18 +117,19 @@ namespace coloc
 
 			scale += dist1/dist2;
 		}
+
 		scaleDiff = scale / (commonFeatures.size() - 1);
 		return scaleDiff;
 	}
 
-	bool Utils::rescaleMap(Scene& scene, float scale)
+	bool Utils::rescaleMap(Scene& scene, double scale)
 	{
 		for (const auto & landmark : scene.GetLandmarks()) {
 			scene.structure.at(landmark.first).X = scene.structure.at(landmark.first).X * scale;
 		}
 
 		for (unsigned int i = 0; i < scene.poses.size(); ++i) {
-			scene.poses[i] = Pose3(scene.poses.at(i).rotation(), scene.poses.at(i).translation() * scale);
+			scene.poses[i] = Pose3(scene.poses.at(i).rotation(), scene.poses.at(i).center() * scale);
 		}
 		return Success;
 	}

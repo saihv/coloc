@@ -100,12 +100,13 @@ namespace coloc
 		std::string refinedMap = "refined.ply";
 		saveSceneData(this->scene, initialMap);
 		std::cout << "Refining scene...";
+		float rmse;
 		if(Adjust)
-			refiner.refinePose(*scene, ba_refine_options);
+			refiner.refinePose(*scene, ba_refine_options, rmse);
 		std::cout << "Done." << std::endl;
 		// resectionCamera(2);
 
-		//saveSceneData(this->scene, refinedMap);
+		saveSceneData(this->scene, refinedMap);
 	}
 	
 	void Reconstructor::initializeTracks(Pair& viewPair)

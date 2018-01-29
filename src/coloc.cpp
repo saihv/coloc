@@ -40,7 +40,7 @@ int main()
 		}
 	}
 
-	coloc.initMap(drones, 8.5);
+	coloc.initMap(drones, 8.2);
 
 	Pose3 pose;
 	Cov6 cov;
@@ -48,7 +48,7 @@ int main()
 	numDrones = 2;
 	plotter.plotScene(coloc.data.scene);
 	coloc.imageNumber = 1;
-	while (coloc.imageNumber < 2) {
+	while (coloc.imageNumber < 145) {
 
 		for (int droneId = 0; droneId < 2; droneId++) {
 			Pose3 poseIntra;
@@ -61,8 +61,6 @@ int main()
 		Cov6 covInter;
 		coloc.interPoseEstimator(1, 0, Pose3(), poseInter, covInter);
 		plotter.plotPose(poseInter, 1);
-			//coloc.interPoseEstimator(0, 3, Pose3(), intraPose, intraCov);
-		
 		coloc.imageNumber++;
 	}
 
