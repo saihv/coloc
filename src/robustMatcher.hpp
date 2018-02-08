@@ -293,11 +293,11 @@ namespace coloc
 		std::vector <IndMatch> putativeMatches, filteredMatches;
 
 		matching::DistanceRatioMatch(
-			0.8, BRUTE_FORCE_HAMMING,
+			0.999, BRUTE_FORCE_HAMMING,
 			*data1.mapRegions.get(),
 			*data2.mapRegions.get(),
 			putativeMatches);
-
+		
 		const PointFeatures featI = data1.mapRegions->GetRegionsPositions();
 		const PointFeatures featJ = data2.mapRegions->GetRegionsPositions();
 
@@ -330,6 +330,7 @@ namespace coloc
 			for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
 				commonFeatures.push_back(putativeMatches[relativePose.vec_inliers[ic]]);
 		}
+		commonFeatures = putativeMatches;
 	}
 
 	std::unique_ptr <RelativePose_Info> RobustMatcher::computeRelativePose(Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)

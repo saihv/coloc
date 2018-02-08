@@ -30,7 +30,7 @@ namespace coloc
 		else if (params.featureDetectorType == "BINARY")
 			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
 
-		//image_describer->Set_configuration_preset(features::ULTRA_PRESET);
+		image_describer->Set_configuration_preset(features::ULTRA_PRESET);
 	}
 
 	bool FeatureExtractor::detectFeatures(unsigned int index, FeatureMap &regions, std::string &imageName)

@@ -124,7 +124,7 @@ namespace coloc
 	{
 		auto start = std::chrono::system_clock::now();
 		std::vector <std::string> filename;
-		std::string matchesFile = "matches.svg";
+		std::string matchesFile = "matches" + std::to_string(imageNumber) + ".svg";
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 
 		filename.push_back(params.imageFolder + "img__Quad" + std::to_string(sourceId) + "_" + number + ".png");
@@ -136,6 +136,7 @@ namespace coloc
 			detector.detectFeatures(i, tempScene.regions, filename[i]);
 			detector.saveFeatureData(i, tempScene.regions, filename[i]);
 
+			std::cout << filename[i] << std::endl;
 			tempScene.scene.views[i].reset(new View(filename[i], i, 0, i, params.imageSize.first, params.imageSize.second));
 		}
 
@@ -147,11 +148,11 @@ namespace coloc
 		std::cout << "Creating temporary map" << std::endl;
 		coloc::Reconstructor tempReconstructor(params);
 		coloc::Utils tempUtils;
-		tempReconstructor.reconstructScene(tempScene, origin, 1.0, false);
+		tempReconstructor.reconstructScene(tempScene, Pose3(), 1.0, false);
 
 		PoseRefiner refiner;
 		float rmse;
-		const Optimize_Options refinementOptions(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::NONE);
+		const Optimize_Options refinementOptions(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::ADJUST_ALL);
 		bool locStatus = refiner.refinePose(tempScene.scene, refinementOptions, rmse, cov);
 
 		tempScene.scene.s_root_path = params.imageFolder;
@@ -160,11 +161,21 @@ namespace coloc
 		std::vector <IndMatch> commonFeatures;
 		robustMatcher.matchMaps(data, tempScene, commonFeatures);
 
-		utils.drawMatches(matchesFile, filename[0], filename[0], *data.mapRegions.get(), *tempScene.mapRegions.get(), commonFeatures);
+		//utils.drawMatches(matchesFile, filename[0], filename[0], *data.mapRegions.get(), *tempScene.mapRegions.get(), commonFeatures);
 		double scaleDiff = utils.computeScaleDifference(params, data, tempScene, commonFeatures);
 
 		std::cout << "Found scale difference to be " << scaleDiff << std::endl;
 		utils.rescaleMap(tempScene.scene, scaleDiff);
+
+		const Optimize_Options refinementOptions2(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::NONE);
+		locStatus = refiner.refinePose(tempScene.scene, refinementOptions2, rmse, cov);
+
+		if (cov.size() == 0) {
+			double cov_pose[6 * 6] = { 1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1 };
+			std::array<double, 6 * 6> covpose;
+			std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
+			cov.push_back(covpose);
+		}
 
 		pose = tempScene.scene.poses.at(1);
 		std::string newMapFile = params.imageFolder + "newmap.ply";

@@ -10,7 +10,7 @@ LocalizationParams initParams()
 	params.featureDetectorType = "BINARY";
 	params.imageSize = std::make_pair(640, 480);
 	params.K << 320, 0, 320, 0, 320, 240, 0, 0, 1;
-	params.imageFolder = "D:/test/colocTests/interTestHarder/";
+	params.imageFolder = "D:/test/colocTests/covTest/";
 	params.filterType = 'H';
 	return params;
 }
@@ -21,8 +21,9 @@ int main()
 	int startNum = 0;
 	std::vector<int> drones;
 	LocalizationParams params = initParams();
-	drones.push_back(1);
 	drones.push_back(0);
+	drones.push_back(1);
+	//drones.push_back(2);
 	ColoC coloc(numDrones, startNum, params);
 
 	coloc.poseFile = params.imageFolder + "poses.txt";
@@ -40,29 +41,73 @@ int main()
 		}
 	}
 
-	coloc.initMap(drones, 8.2);
+	coloc.initMap(drones, 6);
 
 	Pose3 pose;
 	Cov6 cov;
 	Plotter plotter;
-	numDrones = 2;
+	std::vector<int> dronesIntra;
+	dronesIntra.push_back(0);
+	dronesIntra.push_back(1);
+	dronesIntra.push_back(2);
 	plotter.plotScene(coloc.data.scene);
-	coloc.imageNumber = 1;
-	while (coloc.imageNumber < 145) {
+	coloc.imageNumber = 80;
 
-		for (int droneId = 0; droneId < 2; droneId++) {
+	while (coloc.imageNumber < 81) {
+
+		std::vector <Pose3> poseIntraVector;
+		std::vector <Cov6> covIntraVector;
+
+		for (int droneId = 0; droneId < dronesIntra.size(); droneId++) {
+			Pose3 poseIntra;
+			Cov6 covIntra;
+			coloc.intraPoseEstimator(dronesIntra[droneId], poseIntra, covIntra);
+			poseIntraVector.push_back(poseIntra);
+			plotter.plotPose(poseIntraVector[droneId], 0);
+		}
+		
+		//if 
+
+		//Pose3 poseInter;
+		//Cov6 covInter;
+		//coloc.interPoseEstimator(1, 0, Pose3(), poseInter, covInter);
+		//plotter.plotPose(poseInter, 1);
+		coloc.imageNumber++;
+	}
+	/* 3 TRAJ NEW 2
+	while (coloc.imageNumber < 162) {
+
+		std::vector <Pose3> poseIntraVector;
+		std::vector <Cov6> covIntraVector;
+
+		for (int droneId = 0; droneId < numDrones; droneId++) {
 			Pose3 poseIntra;
 			Cov6 covIntra;
 			coloc.intraPoseEstimator(droneId, poseIntra, covIntra);
-			plotter.plotPose(poseIntra, 0);
+			poseIntraVector.push_back(poseIntra);
+			plotter.plotPose(poseIntraVector[droneId], 0);
 		}
 
-		Pose3 poseInter;
-		Cov6 covInter;
-		coloc.interPoseEstimator(1, 0, Pose3(), poseInter, covInter);
-		plotter.plotPose(poseInter, 1);
+		if (coloc.imageNumber % 10 == 0) {
+			Pose3 poseInter;
+			Cov6 covInter;
+			coloc.interPoseEstimator(0, 1, poseIntraVector[0], poseInter, covInter);
+			poseInter.center() = poseInter.center() + poseIntraVector[0].center();
+			plotter.plotPose(poseInter, 1);
+			Pose3 poseInter2;
+			Cov6 covInter2;
+			coloc.interPoseEstimator(0, 2, poseIntraVector[0], poseInter2, covInter2);
+			poseInter2.center() = poseInter2.center() + poseIntraVector[0].center();
+			plotter.plotPose(poseInter2, 1);
+		}
+
+		//Pose3 poseInter;
+		//Cov6 covInter;
+		//coloc.interPoseEstimator(1, 0, Pose3(), poseInter, covInter);
+		//plotter.plotPose(poseInter, 1);
 		coloc.imageNumber++;
 	}
+	*/
 
 	/*
 	coloc.imageNumber = 10;
@@ -84,6 +129,7 @@ int main()
 			drones.push_back(3);
 			coloc.updateMap(drones);
 		}
+
 
 		coloc.intraPoseEstimator(droneId, poseIntra, covIntra);
 		plotter.plotPose(poseIntra);

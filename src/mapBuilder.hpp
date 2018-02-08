@@ -104,9 +104,10 @@ namespace coloc
 		if(Adjust)
 			refiner.refinePose(*scene, ba_refine_options, rmse);
 		std::cout << "Done." << std::endl;
-		// resectionCamera(2);
-
-		saveSceneData(this->scene, refinedMap);
+		//resectionCamera(2);
+		//if (Adjust)
+		//	refiner.refinePose(*scene, ba_refine_options, rmse);
+		saveSceneData(this->scene, refinedMap);		
 	}
 	
 	void Reconstructor::initializeTracks(Pair& viewPair)

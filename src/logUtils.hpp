@@ -42,10 +42,10 @@ namespace coloc
 			a3 = -1 * a3;
 
 		if (abs(a1) > 120) {
-			if (a3 < 0)
-				a3 = 180 + a3;
+			if (a1 < 0)
+				a1 = 180 + a1;
 			else
-				a3 = a3 - 180;
+				a1 = a1 - 180;
 		}
 
 		angles[0] = a1 * M_PI / 180;

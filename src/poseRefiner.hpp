@@ -54,8 +54,8 @@ namespace coloc
 		{
 			bool bVerbose_ = true;
 			unsigned int nb_threads_ = 1;
-			bool bCeres_summary_ = false;
-			int linear_solver_type_ = ceres::SPARSE_SCHUR;
+			bool bCeres_summary_ = true;
+			int linear_solver_type_ = ceres::DENSE_SCHUR;
 			int preconditioner_type_ = ceres::JACOBI;
 			int sparse_linear_algebra_library_type_ = ceres::CX_SPARSE;
 			double parameter_tolerance_ = 1e-8;
@@ -88,37 +88,8 @@ namespace coloc
 			double angleAxis[3];
 			ceres::RotationMatrixToAngleAxis((const double*)R.data(), angleAxis);
 
-			float a1, a2, a3;
-			Vec3 angles = R.eulerAngles(2, 1, 0);
-
-			a1 = angles[0] * 180 / M_PI;
-			a2 = angles[2] * 180 / M_PI;
-			a3 = angles[1] * 180 / M_PI;
-			if (abs(a2) > 120) {
-				if (a2 < 0)
-					a2 = (-1 * a2 - 180);
-				else
-					a2 = 180 - a2;
-			}
-
-			if (abs(a3) > 120) {
-				if (a3 < 0)
-					a3 = 180 + a3;
-				else
-					a3 = a3 - 180;
-			}
-			else
-				a3 = -1 * a3;
-
-			if (abs(a1) > 120) {
-				if (a3 < 0)
-					a3 = 180 + a3;
-				else
-					a3 = a3 - 180;
-			}
-
 			// angleAxis + translation
-			mapPoses[poseIdx] = { a1, a2, a3, t(0), t(1), t(2) };
+			mapPoses[poseIdx] = { angleAxis[0], angleAxis[1], angleAxis[2], t(0), t(1), t(2) };
 
 			double * parameter_block = &mapPoses[poseIdx][0];
 			poseParameter.push_back(parameter_block);
@@ -212,7 +183,9 @@ namespace coloc
 		ceresConfig.logging_type = ceres::SILENT;
 		ceresConfig.num_threads = ceresOptions.nb_threads_;
 		ceresConfig.num_linear_solver_threads = ceresOptions.nb_threads_;
-		ceresConfig.parameter_tolerance = ceresOptions.parameter_tolerance_;
+		ceresConfig.function_tolerance = 1e-16;
+		ceresConfig.gradient_tolerance = 1e-16;
+		ceresConfig.parameter_tolerance = 1e-16;
 
 		// Solve BA
 		ceres::Solver::Summary summary;
@@ -221,20 +194,25 @@ namespace coloc
 			std::cout << summary.FullReport() << std::endl;
 
 		if (covariance_blocks.size() != 0) {
-			covariance.Compute(covariance_blocks, &problem);
-			if (poseParameter.size() > 1) {
-				std::array<double, 6 * 6> covpose;
-				double cov_pose[6 * 6];
-				covariance.GetCovarianceBlock(poseParameter[1], poseParameter[1], cov_pose);
-				std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
-				poseCovariance.push_back(covpose);
+			try {
+				covariance.Compute(covariance_blocks, &problem);
+				if (poseParameter.size() > 1) {
+					std::array<double, 6 * 6> covpose;
+					double cov_pose[6 * 6];
+					covariance.GetCovarianceBlock(poseParameter[1], poseParameter[1], cov_pose);
+					std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
+					poseCovariance.push_back(covpose);
+				}
+				else {
+					std::array<double, 6 * 6> covpose;
+					double cov_pose[6 * 6];
+					covariance.GetCovarianceBlock(poseParameter[0], poseParameter[0], cov_pose);
+					std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
+					poseCovariance.push_back(covpose);
+				}
 			}
-			else {
-				std::array<double, 6 * 6> covpose;
-				double cov_pose[6 * 6];
-				covariance.GetCovarianceBlock(poseParameter[0], poseParameter[0], cov_pose);
-				std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
-				poseCovariance.push_back(covpose);
+			catch (std::exception &e) {
+				std::cout << "Covariance computation failed." << std::endl;
 			}
 		}		
 

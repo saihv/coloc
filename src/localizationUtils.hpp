@@ -88,23 +88,23 @@ namespace coloc
 	{
 		if (commonFeatures.empty()) {
 			std::cout << "No common features between the maps." << std::endl;
-			return Failure;
+			return 1.0;
 		}
 
 		std::cout << "Number of common features between the maps: " << commonFeatures.size() << std::endl;
-
-		Mat pt3D_1, pt3D_2;
 		
+		double scale = 0.0, scaleDiff = 1.0;
+		/*
+		Mat pt3D_1, pt3D_2;
+
 		pt3D_1.resize(3, commonFeatures.size());
 		pt3D_2.resize(3, commonFeatures.size());
-
-		double scale = 0.0, scaleDiff = 1.0;
 
 		for (size_t i = 0; i < commonFeatures.size(); ++i) {
 			pt3D_1.col(i) = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
 			pt3D_2.col(i) = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i].j_]).X;	
 		}
-
+		*/
 		for (size_t i = 0; i < commonFeatures.size() - 1; ++i) {
 			Vec3 X11 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
 			Vec3 X12 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i + 1].i_]).X;

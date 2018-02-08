@@ -1,5 +1,5 @@
-colocPoses = fopen('C:/Users/saihv/Desktop/3traj/poses.txt');
-gtPoses = fopen('C:/Users/saihv/Desktop/3traj/airsim_rec2018-01-22-12-55-23.txt');
+colocPoses = fopen('D:/test/colocTests/3trajNew2/poses.txt');
+gtPoses = fopen('D:/test/colocTests/3trajNew2/airsim_rec2018-01-29-13-57-31.txt');
 
 figure(1);
 hold on;

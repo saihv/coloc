@@ -153,6 +153,9 @@ namespace coloc
 	bool Localizer::refine(Pose3 &pose, Image_Localizer_Match_Data& matchData, Cov6 &poseCovariance, float& rmse)
 	{
 		Scene scene;
+
+		std::vector <cv::Point3f> objectPoints;
+		std::vector <cv::Point2f> imagePoints;
 		scene.views.insert({ 0, std::make_shared<View>("",0, 0, 0) });
 		scene.poses[0] = pose;
 		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)(0, 0), (*K)(0, 2), (*K)(1, 2));
@@ -163,7 +166,9 @@ namespace coloc
 			const size_t idx = matchData.vec_inliers[i];
 			Landmark landmark;
 			landmark.X = matchData.pt3D.col(idx);
+			objectPoints.push_back(cv::Point3f(landmark.X[0], landmark.X[1], landmark.X[2]));
 			landmark.obs[0] = Observation(matchData.pt2D.col(idx), UndefinedIndexT);
+			imagePoints.push_back(cv::Point2f(matchData.pt2D.col(idx)[0], matchData.pt2D.col(idx)[1]));
 			scene.structure[i] = std::move(landmark);
 		}
 
@@ -175,6 +180,51 @@ namespace coloc
 			ba_refine_options, rmse, poseCovariance);
 		if (refineStatus)
 			pose = scene.poses[0];
+
+		cv::Mat rvec, J;
+
+		cv::eigen2cv(pose.rotation(), rvec);
+		cv::Mat tvec = cv::Mat(1, 3, CV_32FC1, cv::Scalar::all(0));
+
+		tvec.at<float>(0, 0) = pose.center()[0];
+		tvec.at<float>(0, 1) = pose.center()[1];
+		tvec.at<float>(0, 2) = pose.center()[2];
+
+		cv::Mat Kcv = cv::Mat(3, 3, CV_32FC1, cv::Scalar::all(0));
+		Kcv.at<float>(0, 0) = 320.0;
+		Kcv.at<float>(0, 2) = 320.0f;
+		Kcv.at<float>(1, 1) = 320.0f;
+		Kcv.at<float>(1, 2) = 240.0f;
+		Kcv.at<float>(2, 2) = 1.0f;
+
+		cv::Mat distcv = cv::Mat(5, 1, CV_32FC1, cv::Scalar::all(0));
+
+
+		cv::Mat p;
+		cv::projectPoints(objectPoints, rvec, tvec, Kcv, distcv, p, J);
+
+		std::vector <cv::Point2f> reprojected;
+
+		for (int i = 0; i < p.rows; i++) {
+			reprojected.push_back(cv::Point2f(p.at<double>(i, 0), p.at<double>(i, 1)));
+		}
+
+		float error = 0.0;
+		for (int j = 0; j < reprojected.size(); j++)
+		{
+			error += cv::norm(imagePoints[j], reprojected[j], cv::NORM_L2);
+		}
+
+		cv::Mat Sigma = cv::Mat(J.t() * J, cv::Rect(0, 0, 6, 6)).inv();
+		cv::Mat std_dev;
+		sqrt(Sigma.diag(), std_dev);
+		std::cout << "Translation standard deviation:" << std::endl << std_dev.at<double>(0, 3) << std::endl << std_dev.at<double>(0, 4) << std::endl << std_dev.at<double>(0, 5) << std::endl;
+
+		std::cout << "Total standard deviation:" << std::endl << std_dev << std::endl;
+
+		//poseCovariance[0][21] = std_dev.at<double>(0, 3);
+		//poseCovariance[0][28] = std_dev.at<double>(0, 4);
+		//poseCovariance[0][35] = std_dev.at<double>(0, 5);
 		
 		return refineStatus;
 	}
