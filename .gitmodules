@@ -1,0 +1,6 @@
+[submodule "lib/openMVG"]
+	path = lib/openMVG
+	url = https://github.com/openMVG/openMVG
+[submodule "lib/dlib"]
+	path = lib/dlib
+	url = https://github.com/davisking/dlib

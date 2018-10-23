@@ -1,82 +1,117 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
-PROJECT(coloc C CXX)
+cmake_minimum_required(VERSION 2.8.3)
+project(coloc)
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bin")
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
-CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
-if(COMPILER_SUPPORTS_CXX11)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-elseif(COMPILER_SUPPORTS_CXX0X)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-else()
-        message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
-endif()
+option(USE_CUDA "Enable CUDA features" OFF)
+option(USE_ROS "Enable ROS integration" OFF)
 
-set(OpenMVG_DIR "/home/sai/software/installMVG/share/openMVG/cmake")
+if(UNIX)
+  add_definitions(-DUSE_ROS)
+  set(OpenMVG_DIR "/home/sai/lib/openMVG/install/share/openMVG/cmake")
+endif(UNIX)
 
-find_package (OpenMVG REQUIRED)
-find_package( Threads REQUIRED)
+if(MSVC)
+  #set(OpenMVG_DIR "D:/Code/Libraries/openMVG_install/share/openMVG/cmake")
+  #set(OpenCV_DIR "D:/Code/Libraries/opencv-3.4.0/opencv-3.4.0/build")
+  set(OpenMVG_DIR "C:/Code/Libraries/openMVG/install_debug/share/openMVG/cmake")
+  set(OpenCV_DIR "C:/Code/Libraries/opencv/install_debug")
+endif(MSVC)
 
-find_package(OpenMP)
-if (OPENMP_FOUND)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-endif(OPENMP_FOUND)
+add_subdirectory(../../github/dlib dlib_build)
+
+FIND_PACKAGE(OpenMVG REQUIRED)
+FIND_PACKAGE(OpenCV REQUIRED)
+
+if(UNIX)
+  find_package(
+    catkin REQUIRED COMPONENTS
+    cv_bridge
+    roscpp
+    std_msgs
+    image_transport
+  )
+
+  catkin_package(
+  INCLUDE_DIRS include
+  LIBRARIES coloc
+  CATKIN_DEPENDS cv_bridge roscpp std_msgs image_transport
+#  DEPENDS system_lib
+  )
+endif(UNIX)
+
+if(USE_CUDA)
+  add_definitions(-DUSE_CUDA)
+  FIND_PACKAGE(CUDA REQUIRED) 
+  SET(CUDA_NVCC_FLAGS "-arch=sm_61 --use_fast_math -O3" CACHE STRING "nvcc flags" FORCE)
+  SET (CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE)
+  SET(LIB_TYPE STATIC) 
+  include_directories(include)
+  CUDA_ADD_LIBRARY(koral ${LIB_TYPE} src/CUDALERP.cu src/CLATCH.cu src/CUDAK2NN.cu)
+endif(USE_CUDA)
+
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Ofast -std=c++11 -march=native -funroll-all-loops -fpeel-loops -ftracer -ftree-vectorize -mavx2 -mfma -fomit-frame-pointer")
 
 include_directories(
-    ${OPENMVG_INCLUDE_DIRS}
-    ${Eigen_INCLUDE_DIRS}
+if(MSVC)
+  include
+endif(MSVC)
+  ${OPENMVG_INCLUDE_DIRS}
+
+if(UNIX)
+  ${catkin_INCLUDE_DIRS}
+endif(UNIX)
+  ${OPENCV_INCLUDE_DIRS}
 )
 
-add_executable(lister src/ImageListing.cpp)
-target_link_libraries(lister
-  openMVG_system
-  openMVG_image
-  openMVG_features
-  openMVG_sfm
-  easyexif)
+if(MSVC)
+  file(
+    GLOB_RECURSE
+    coloc_headers
+    include/coloc/*.hpp
+  )
+  file(
+  GLOB_RECURSE
+  coloc_files
+  src/coloc_node.cpp
+  )
 
-add_executable(detector src/ComputeFeatures.cpp)
-target_link_libraries(detector
+  add_executable(coloc ${coloc_headers} ${coloc_files})
+endif(MSVC)
+
+if(UNIX)
+  add_executable(coloc src/coloc_node.cpp)
+endif(UNIX)
+
+target_link_libraries(coloc dlib::dlib)
+
+if(USE_CUDA)
+  add_dependencies(coloc koral)
+endif(USE_CUDA)
+
+target_link_libraries(coloc
+  ${OpenCV_LIBS}
   openMVG_system
   openMVG_image
   openMVG_features
   openMVG_multiview
-  openMVG_sfm
-  stlplus
-  vlsift)
-
-add_executable(matcher src/ComputeMatches.cpp)
-target_link_libraries(matcher
-  openMVG_system
-  openMVG_features
-  openMVG_multiview
-  openMVG_sfm
   openMVG_matching_image_collection
-  stlplus)
-
-add_subdirectory(src/deps)
-
-add_executable(reconstructor src/Reconstruct.cpp)
-target_link_libraries(reconstructor
-  openMVG_system
-  openMVG_image
-  openMVG_features
   openMVG_sfm
-  coloc_sfm
-  stlplus)
+  openMVG_geometry
+  ceres
+  stlplus
+  easyexif
+  vlsift
+  dlib::dlib
+ )
 
-add_executable(localizer src/Localize.cpp)
-target_link_libraries(localizer
-openMVG_system
-openMVG_image
-openMVG_features
-openMVG_matching_image_collection
-openMVG_sfm
-coloc_sfm
-easyexif
-vlsift)
+
+if(UNIX)
+  target_link_libraries(coloc ${catkin_LIBRARIES})
+endif(UNIX)
+
+if(USE_CUDA)
+  target_link_libraries(coloc koral)
+endif(USE_CUDA)
