@@ -7,18 +7,6 @@
 
 #pragma once
 
-#include "openMVG/features/akaze/image_describer_akaze.hpp"
-#include "openMVG/features/image_describer_akaze_io.hpp"
-#include "openMVG/image/image_io.hpp"
-#include "openMVG/features/descriptor.hpp"
-#include "openMVG/features/feature.hpp"
-#include "openMVG/matching/indMatch.hpp"
-#include "openMVG/matching/indMatch_utils.hpp"
-#include "openMVG/matching_image_collection/Matcher_Regions.hpp"
-#include "openMVG/matching_image_collection/Cascade_Hashing_Matcher_Regions.hpp"
-#include "openMVG/matching_image_collection/Pair_Builder.hpp"
-#include "openMVG/matching/regions_matcher.hpp"
-
 #include "coloc/colocParams.hpp"
 #include "coloc/colocData.hpp"
 #include "coloc/FeatureMatcher.hpp"

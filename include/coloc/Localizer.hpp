@@ -1,19 +1,9 @@
 #pragma once
 
-#pragma once
-
-#include "openMVG/features/akaze/image_describer_akaze.hpp"
-#include "openMVG/features/image_describer_akaze_io.hpp"
-#include "openMVG/image/image_io.hpp"
-#include "openMVG/features/descriptor.hpp"
-#include "openMVG/features/feature.hpp"
-#include "nonFree/sift/SIFT_describer_io.hpp"
-#include "openMVG/sfm/sfm.hpp"
 #include "Refiner.hpp"
 #include "colocUtils.hpp"
 #include "coloc/colocParams.hpp"
 #include "coloc/colocData.hpp"
-
 
 #include "opencv2/core.hpp"
 

@@ -5,43 +5,16 @@
 #include "colocParams.hpp"
 #include "colocData.hpp"
 
-#include "openMVG/image/image_io.hpp"
-#include "openMVG/features/descriptor.hpp"
-#include "openMVG/features/feature.hpp"
-#include "openMVG/matching/indMatch.hpp"
-#include "openMVG/matching/indMatch_utils.hpp"
-#include "openMVG/matching_image_collection/Matcher_Regions.hpp"
-#include "openMVG/matching_image_collection/Cascade_Hashing_Matcher_Regions.hpp"
-#include "openMVG/matching_image_collection/GeometricFilter.hpp"
-#include "openMVG/sfm/pipelines/sfm_robust_model_estimation.hpp"
-#include "openMVG/matching_image_collection/F_ACRobust.hpp"
-#include "openMVG/matching_image_collection/E_ACRobust.hpp"
-#include "openMVG/matching_image_collection/H_ACRobust.hpp"
-#include "openMVG/matching/regions_matcher.hpp"
-#include "openMVG/sfm/pipelines/sfm_features_provider.hpp"
-#include "openMVG/sfm/pipelines/sfm_matches_provider.hpp"
-#include "openMVG/sfm/pipelines/sfm_robust_model_estimation.hpp"
-#include "openMVG/sfm/pipelines/sfm_robust_model_estimation.hpp"
-#include "openMVG/cameras/Camera_Intrinsics.hpp"
-#include "openMVG/cameras/Camera_Pinhole.hpp"
 #include "openMVG/multiview/motion_from_essential.hpp"
-#include "openMVG/multiview/solver_essential_kernel.hpp"
-#include "openMVG/multiview/solver_essential_eight_point.hpp"
-#include "openMVG/numeric/numeric.h"
-#include "openMVG/robust_estimation/robust_estimator_ACRansac.hpp"
-#include "openMVG/robust_estimation/robust_estimator_ACRansacKernelAdaptator.hpp"
-#include "openMVG/sfm/pipelines/localization/SfM_Localizer.hpp"
-
 #include "opencv2/calib3d.hpp"
 #include "opencv2/core.hpp"
 #include "opencv2/core/eigen.hpp"
 
+#include <iostream>
+
 using namespace openMVG::cameras;
 using namespace openMVG::geometry;
 using namespace openMVG::matching_image_collection;
-
-#include <iostream>
-
 using namespace openMVG;
 using namespace openMVG::features;
 using namespace openMVG::matching;
