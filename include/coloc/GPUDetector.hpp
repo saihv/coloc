@@ -2,11 +2,11 @@
 
 #ifdef USE_CUDA
 
-#ifdef USE_ROS
+#ifdef USE_STREAM
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
-#endif USE_ROS
+#endif USE_STREAM
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>

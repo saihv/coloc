@@ -28,7 +28,7 @@ namespace coloc
     {
     public:
         bool refinementOptions(bool verbose);
-        bool refinePose(SfM_Data& scene, const Optimize_Options options, float& rmse, Cov6 &poseCovariance);
+        bool refinePose(SfM_Data& scene, const Optimize_Options options, float& rmse, Cov6& poseCovariance);
 
     private:
         struct CeresOptions
@@ -44,7 +44,7 @@ namespace coloc
         } ceresOptions;
     };
 
-    bool PoseRefiner::refinePose(SfM_Data &scene, const Optimize_Options options, float& rmse, std::vector<std::array<double, 6 * 6> > &poseCovariance = std::vector<std::array<double, 36> >())
+    bool PoseRefiner::refinePose(SfM_Data &scene, const Optimize_Options options, float& rmse, std::vector<std::array<double, 6 * 6> > &poseCovariance )
     {
         ceres::Problem problem;
 

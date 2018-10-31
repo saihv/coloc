@@ -50,8 +50,8 @@ namespace coloc
 			return EXIT_SUCCESS;
 		}
 
-#ifdef USE_ROS
-		bool CPUDetector::detectFeaturesTopic(unsigned int idx, FeatureMap &regions, cv_bridge::CvImagePtr imagePtr)
+#ifdef USE_STREAM
+		bool detectFeaturesTopic(unsigned int idx, FeatureMap &regions, cv_bridge::CvImagePtr imagePtr)
 		{
 
 		}

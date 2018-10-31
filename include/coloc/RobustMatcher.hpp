@@ -212,18 +212,18 @@ namespace coloc
 			return EXIT_SUCCESS;
 		}
 
-		bool matchMaps(colocData &data1, colocData &data2, std::vector<IndMatch> &commonFeatures)
+		bool matchMaps(std::unique_ptr<features::Regions> &scene1, std::unique_ptr<features::Regions> &scene2, std::vector<IndMatch> &commonFeatures)
 		{
 			std::vector <IndMatch> putativeMatches, filteredMatches;
 
 			matching::DistanceRatioMatch(
 				0.8, BRUTE_FORCE_HAMMING,
-				*data1.mapRegions.get(),
-				*data2.mapRegions.get(),
+				*scene1.get(),
+				*scene2.get(),
 				putativeMatches);
 
-			const PointFeatures featI = data1.mapRegions->GetRegionsPositions();
-			const PointFeatures featJ = data2.mapRegions->GetRegionsPositions();
+			const PointFeatures featI = scene1->GetRegionsPositions();
+			const PointFeatures featJ = scene2->GetRegionsPositions();
 
 			Mat xL(2, putativeMatches.size());
 			Mat xR(2, putativeMatches.size());

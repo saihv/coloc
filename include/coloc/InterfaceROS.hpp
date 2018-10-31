@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef USE_ROS
+#ifdef USE_STREAM
 #include "coloc/colocInterface.hpp"
 #include "coloc/FeatureDetector.hpp"
 

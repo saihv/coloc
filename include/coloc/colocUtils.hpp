@@ -25,7 +25,7 @@ namespace coloc
 	class Utils
 	{
 	public:
-		double computeScaleDifference(colocParams& params, colocData &data1, colocData &data2, std::vector<IndMatch> commonFeatures);
+		double computeScaleDifference(Scene &scene1, std::vector <IndexT> &idx1, Scene &scene2, std::vector <IndexT> &idx2, std::vector<IndMatch> commonFeatures);
 		bool matchSceneWithMap(Scene& scene);
 		bool rescaleMap(Scene& scene, double scale);
 		int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
@@ -152,7 +152,7 @@ namespace coloc
 		return EXIT_SUCCESS;
 	}
 
-	double Utils::computeScaleDifference(colocParams& params, colocData &data1, colocData &data2, std::vector<IndMatch> commonFeatures)
+	double Utils::computeScaleDifference(Scene &scene1, std::vector <IndexT> &idx1, Scene &scene2, std::vector <IndexT> &idx2, std::vector<IndMatch> commonFeatures)
 	{
 		if (commonFeatures.empty()) {
 			std::cout << "No common features between the maps." << std::endl;
@@ -174,11 +174,11 @@ namespace coloc
 		}
 		*/
 		for (size_t i = 0; i < commonFeatures.size() - 1; ++i) {
-			Vec3 X11 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
-			Vec3 X12 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i + 1].i_]).X;
+			Vec3 X11 = scene1.GetLandmarks().at(idx1[commonFeatures[i].i_]).X;
+			Vec3 X12 = scene1.GetLandmarks().at(idx1[commonFeatures[i + 1].i_]).X;
 
-			Vec3 X21 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i].j_]).X;
-			Vec3 X22 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i + 1].j_]).X;
+			Vec3 X21 = scene2.GetLandmarks().at(idx2[commonFeatures[i].j_]).X;
+			Vec3 X22 = scene2.GetLandmarks().at(idx2[commonFeatures[i + 1].j_]).X;
 
 			float dist1 = (X12 - X11).norm();
 			float dist2 = (X22 - X21).norm();

@@ -14,6 +14,7 @@ namespace coloc
 		colocFilter(unsigned int& nDrones)
 		{
 			for (unsigned int i = 0; i < nDrones; ++i) {
+				std::cout << "Number of drones: " << nDrones << std::endl;
 				cv::Mat measurements(nMeasurements, 1, CV_64F); measurements.setTo(cv::Scalar(0));
 				cv::KalmanFilter KF;
 				initKalmanFilter(KF, nStates, nMeasurements, nInputs, dt);

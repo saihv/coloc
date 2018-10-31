@@ -29,7 +29,7 @@ namespace coloc
 		EMatcherType matchingType;
 
 	public:
-		CPUMatcher <typename T> (MatcherOptions &opts)
+		CPUMatcher (MatcherOptions &opts)
 		{	
 			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
 			matchingType = BRUTE_FORCE_HAMMING;

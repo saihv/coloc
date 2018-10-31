@@ -6,10 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(USE_CUDA "Enable CUDA features" OFF)
-option(USE_ROS "Enable ROS integration" OFF)
+option(USE_ROS "Enable ROS integration" ON)
 
 if(UNIX)
-  add_definitions(-DUSE_ROS)
+  add_definitions(-DENABLE_ROS)
   set(OpenMVG_DIR "/home/sai/lib/openMVG/install/share/openMVG/cmake")
 endif(UNIX)
 
@@ -20,14 +20,14 @@ if(MSVC)
   set(OpenCV_DIR "C:/Code/Libraries/opencv/install_debug")
 endif(MSVC)
 
-add_subdirectory(../../github/dlib dlib_build)
-
 FIND_PACKAGE(OpenMVG REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
+FIND_PACKAGE(dlib REQUIRED)
 
 if(UNIX)
   find_package(
     catkin REQUIRED COMPONENTS
+    pcl_ros
     cv_bridge
     roscpp
     std_msgs
@@ -37,7 +37,7 @@ if(UNIX)
   catkin_package(
   INCLUDE_DIRS include
   LIBRARIES coloc
-  CATKIN_DEPENDS cv_bridge roscpp std_msgs image_transport
+  CATKIN_DEPENDS pcl_ros cv_bridge roscpp std_msgs image_transport
 #  DEPENDS system_lib
   )
 endif(UNIX)
@@ -85,7 +85,7 @@ if(UNIX)
   add_executable(coloc src/coloc_node.cpp)
 endif(UNIX)
 
-target_link_libraries(coloc dlib::dlib)
+target_link_libraries(coloc dlib)
 
 if(USE_CUDA)
   add_dependencies(coloc koral)
@@ -104,7 +104,7 @@ target_link_libraries(coloc
   stlplus
   easyexif
   vlsift
-  dlib::dlib
+  dlib
  )
 
 

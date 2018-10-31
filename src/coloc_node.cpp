@@ -1,5 +1,3 @@
-#pragma once
-
 #include "coloc/coloc.hpp"
 
 using namespace openMVG;
@@ -19,7 +17,8 @@ void readCalibData(std::vector<Mat3>& K, std::vector<Vec3>& dist, std::string& f
 		while (std::getline(lineStream, cell, ',')) {
 			values.push_back(std::stod(cell));
 		}
-		Eigen::Matrix3d copiedMatrix = Eigen::Map<Eigen::Matrix3d>(&values[0], 3, 3);
+
+		Eigen::Map <Eigen::Matrix <double, 3, 3, Eigen::RowMajor> > copiedMatrix(&values[0]);
 		K.push_back(copiedMatrix);
 		values.clear();
 		++rows;
@@ -41,9 +40,8 @@ void readCalibData(std::vector<Mat3>& K, std::vector<Vec3>& dist, std::string& f
 
 int main(int argc, char **argv)
 {
-#ifdef USE_ROS
-		ros::init(argc, argv, "coloc");
-		ros::NodeHandle nh;
+#ifdef ENABLE_ROS
+		ros::init(argc, argv, "rosr");
 #endif
 
 		DetectorOptions Dopts;
@@ -60,7 +58,7 @@ int main(int argc, char **argv)
 		Mopts.maxkp = 20000;
 		Mopts.thresh = 20;
 
-		unsigned int numDrones = 3;
+		unsigned int numDrones = 2;
 
 		std::vector <Mat3> K;
 		K.reserve(numDrones);
@@ -70,7 +68,7 @@ int main(int argc, char **argv)
 		Mat3 tempK;
 		Vec3 tempdist;
 
-		std::string imageFolder = "C:\\Users\\Sai\\Desktop\\testRellis\\";
+		std::string imageFolder = "/home/sai/Desktop/testRellis/";
 		std::string calibFilename = imageFolder + "calib.txt";
 
 		readCalibData(K, dist, calibFilename, numDrones);

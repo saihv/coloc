@@ -43,7 +43,7 @@ namespace coloc
                   currentFolder(&params.imageFolder)
         {	}
 
-        void reconstructScene(colocData& data, Pose3, float, bool);
+        void reconstructScene(bool inter, colocData& data, Pose3, float, bool);
 
     private:
         // Internal methods
@@ -76,12 +76,16 @@ namespace coloc
         Scene* scene;
     };
 
-    void Reconstructor::reconstructScene(colocData& data, Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero()), float scale = 1.0, bool Adjust = false)
+    void Reconstructor::reconstructScene(bool inter, colocData& data, Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero()), float scale = 1.0, bool Adjust = false)
     {
         this->regionsRCT = &data.regions;
         this->matchesRCT = &data.geometricMatches;
         this->relativePosesRCT = &data.relativePoses;
-        this->scene = &data.scene;
+
+		if (inter)
+			this->scene = &data.tempScene;
+		else
+			this->scene = &data.scene;
 
         int maxMatches = 0;
         Pair seedPair;
@@ -123,8 +127,10 @@ namespace coloc
         saveSceneData(this->scene, initialMap);
         std::cout << "Refining scene...";
         float rmse;
+
+        Cov6 cov;
         if(Adjust)
-            refiner.refinePose(*scene, ba_refine_options, rmse);
+            refiner.refinePose(*scene, ba_refine_options, rmse, cov);
         std::cout << "Done." << std::endl;
         saveSceneData(this->scene, refinedMap);
     }

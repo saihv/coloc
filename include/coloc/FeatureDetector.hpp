@@ -31,7 +31,7 @@ public:
 		return ProcessorType<T>::detectFeaturesFile(idx, regions, imageName);
 	}
 
-#ifdef USE_ROS
+#ifdef USE_STREAM
     virtual void detectFeaturesTopic(uint8_t, coloc::FeatureMap&, cv_bridge::CvImagePtr) = 0;
 #endif
 };

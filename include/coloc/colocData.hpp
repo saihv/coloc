@@ -45,9 +45,11 @@ namespace coloc
         PairWiseMatches putativeMatches, geometricMatches;
         InterPoseMap relativePoses;
         std::map<Pair, double> overlap;
-        Scene scene;
+        Scene scene, tempScene;
         std::unique_ptr<features::Regions> mapRegions;
-        std::vector<IndexT> mapRegionIdx;
+		std::unique_ptr<features::Regions> interMapRegions;
+        std::vector <IndexT> mapRegionIdx;
+		std::vector <IndexT> interMapRegionIdx;
 		Camera* cam;
 		unsigned int numDrones;
 		unsigned int keyframeIdx;
@@ -78,14 +80,29 @@ namespace coloc
 			const openMVG::cameras::Pinhole_Intrinsic_Radial_K3 cam(imageSize.first, imageSize.second, (K)(0, 0), (K)(0, 2), (K)(1, 2), dist[0], dist[1], dist[2]);
 		}
 
-        bool setupMapDatabase()
+        bool setupMapDatabase(bool inter)
         {
 			mapRegions.reset(new AKAZE_Binary_Regions);
-			for (const auto &landmark : scene.GetLandmarks()) {
+			Scene *map;
+			std::vector <IndexT> *indexes;
+			std::unique_ptr<features::Regions> *features;
+
+			if (inter) {
+				map = &this->tempScene;
+				indexes = &this->interMapRegionIdx;
+				features = &this->interMapRegions;
+			}
+			else {
+				map = &this->scene;
+				indexes = &this->mapRegionIdx;
+				features = &this->mapRegions;
+			}
+
+			for (const auto &landmark : map->GetLandmarks()) {
 				const auto &observation = landmark.second.obs.begin();
 				//for (const auto &observation : landmark.second.obs) {
 					if (observation->second.id_feat != UndefinedIndexT) {
-						regions.at(observation->first)->CopyRegion(observation->second.id_feat, mapRegions.get());
+						regions.at(observation->first)->CopyRegion(observation->second.id_feat, features->get());
 						mapRegionIdx.push_back(landmark.first);
 					}
 				//}
