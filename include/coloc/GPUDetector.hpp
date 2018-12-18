@@ -2,11 +2,11 @@
 
 #ifdef USE_CUDA
 
-#ifdef USE_ROS
+#ifdef USE_STREAM
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
-#endif USE_ROS
+#endif USE_STREAM
 
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/core/core.hpp>
@@ -33,6 +33,7 @@ namespace coloc {
 		std::vector<uint64_t> desc;
 		bool receivedImg = false;
 		std::vector<cv::KeyPoint> converted_kps;
+
 	private:
 		struct Level {
 			uint8_t* d_img;
@@ -154,20 +155,31 @@ namespace coloc {
 		}
 
 		// Process an image that is read from disk. converted_kps contains keypoints stored in OpenCV format.
-		static T detectFeaturesFile(uint8_t idx, coloc::FeatureMap& regions, std::string &imageName)
+		T detectFeaturesFile(uint8_t idx, coloc::FeatureMap& regions, std::string &imageName)
 		{
 			cv::Mat image;
 			image = cv::imread(imageName, 0);
 			high_resolution_clock::time_point t1 = high_resolution_clock::now();
 			detectAndDescribe(image.data, image.cols, image.rows, thresh);
 			high_resolution_clock::time_point t2 = high_resolution_clock::now();
-			//ROS_INFO("Detected %d features in %ld ms \n", kps.size(), duration_cast<milliseconds>( t2 - t1 ).count());
-			converted_kps.clear();
-			for (const auto& kp : kps) {
-				const float scale = static_cast<float>(std::pow(1.2f, kp.scale));
-				converted_kps.emplace_back(scale*static_cast<float>(kp.x), scale*static_cast<float>(kp.y), 7.0f*scale, 180.0f / 3.1415926535f * kp.angle, static_cast<float>(kp.score));
-			}
+			std::cout << "Detected "<< kps.size() << " features in " << duration_cast<milliseconds>(t2 - t1).count() << " ms \n" << std::endl;
 
+			regions[idx] = std::unique_ptr <AKAZE_Binary_Regions>(new AKAZE_Binary_Regions);
+
+			regions[idx]->Features().resize(kps.size());
+			regions[idx]->Descriptors().resize(kps.size());
+
+			for (unsigned int i = 0; i < static_cast <int> (kps.size()); ++i) {
+				const float scale = static_cast<float>(std::pow(1.2f, kps[i].scale));
+				regions[idx]->Features()[i] = {
+						scale * static_cast <float> (kps[i].x),
+						scale * static_cast <float> (kps[i].y),
+						7.0f * scale,
+						kps[i].angle
+				};
+
+				std::memcpy(&(regions[idx]->Descriptors()[i]), &(desc[i * 8]), 8 * sizeof(uint64_t));
+			}
 			return EXIT_SUCCESS;
 		}
 
@@ -275,7 +287,7 @@ namespace coloc {
 			desc.resize(8 * kps.size());
 			cudaMemcpy(&desc[0], d_desc, 64 * kps.size(), cudaMemcpyDeviceToHost);
 
-			//cudaDeviceSynchronize();
+			cudaDeviceSynchronize();
 		}
 	};
 }

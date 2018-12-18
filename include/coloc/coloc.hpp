@@ -22,6 +22,8 @@
 #include <chrono>
 #include <ctime>
 
+#define DEBUG 1
+
 using namespace coloc;
 
 class ColoC
@@ -36,18 +38,19 @@ public:
 			data.filenames.push_back("");
 			data.keyframeNames.push_back("");
 
-			currentPoses.push_back(Pose3());
+			currentPoses.push_back(Pose3(Mat3::Identity(), Vec3::Zero()));
 			currentCov.push_back(Cov6());
+			trackCounts.push_back(0);
 		}
 		this->imageNumber = nImageStart;
 		this->mapReady = false;
 	}
-
 	colocData data;
 	colocParams params;
 	DetectorOptions dOpts;
 	MatcherOptions mOpts;
 	int numDrones, imageNumber;
+	int updateNum = 0;
 
 	//std::string poseFile;
 	std::string mapFile;
@@ -58,8 +61,13 @@ private:
 	//FeatureDetectorGPU gpuDetector{ 1.2f, 8, 640, 480, 5000 };
 	//GPUMatcher gpuMatcher{ 5, 5000 };
 
+#ifdef USE_CUDA
+	FeatureDetector <bool, GPUDetector> detector{ dOpts };
+	FeatureMatcher <bool, GPUMatcher> matcher{ mOpts };
+#else
 	FeatureDetector <bool, CPUDetector> detector{ dOpts };
 	FeatureMatcher <bool, CPUMatcher> matcher{ mOpts };
+#endif
 	RobustMatcher robustMatcher{ params };
 	Reconstructor reconstructor{ params };
 	Localizer localizer{ params };
@@ -70,7 +78,9 @@ private:
 	std::string poseFile = params.imageFolder + "poses.txt";
 	std::string filtPoseFile = params.imageFolder + "poses_filtered.txt";
 
-#ifdef USE_ROS
+	std::string seedMapFile;
+
+#ifdef USE_STREAM
 	ROSInterface colocInterface;
 #else
 	DiskInterface colocInterface{ dOpts, params, data };
@@ -81,6 +91,7 @@ private:
 	bool mapReady = false, stopThread = false, commandInter = false, updateMapNow = false;
 	std::vector <Pose3> currentPoses;
 	std::vector <Cov6> currentCov;
+	std::vector <int> trackCounts;
 
 public:
 	void mainThread()
@@ -89,8 +100,7 @@ public:
 		std::vector <Pose3> poses;
 		std::vector <Cov6> covs;
 
-		std::string poseFile = params.imageFolder + "poses.txt";
-		if (logger.createLogFile(poseFile) == EXIT_FAILURE)
+		if (logger.createLogFile(poseFile) == EXIT_FAILURE || logger.createLogFile(filtPoseFile) == EXIT_FAILURE)
 			std::cout << "Cannot create log file for pose data";
 
 		colocInterface.imageNumber = 0;
@@ -98,33 +108,35 @@ public:
 		for (int i = 0; i < data.numDrones; i++)
 			droneIds.push_back(i);
 
+		int ctr = 0;
 		while (!stopThread) {
 			if (!mapReady) {
-				colocInterface.processImages();
-				initMap(droneIds, 5.0);
+				colocInterface.processImages(droneIds);
+				initMap(droneIds, 3.0);
 				mapReady = true;
-				//colocInterface.imageNumber = 300;
-				//params.imageFolder = "C://Users//saihv//Desktop//rellis//traj_r5//";
+				colocInterface.imageNumber = 1;
 			}
-			/*
-			Pose3 pose0, pose1, poseInter;
-			Cov6 cov0, cov1, covInter;
 
-			colocInterface.imageNumber++;
+			this->imageNumber = colocInterface.imageNumber;
+			
+			while (colocInterface.imageNumber < 195) {
+				for (int i = 0; i < 1; ++i) {
+					colocInterface.processImageSingle(droneIds[i]);
+					intraPoseEstimator(i, currentPoses[i], currentCov[i]);
+				}
+				colocInterface.imageNumber++;
+			}
 
-			int droneId = 0;
-			colocInterface.processImageSingle(droneId);
-			intraPoseEstimator(droneId, pose0, cov0);
+			colocInterface.imageNumber = 1000;
+			this->imageNumber = colocInterface.imageNumber;
 
-			droneId = 1;
-			colocInterface.processImageSingle(droneId);
-			intraPoseEstimator(droneId, pose1, cov1);
+			for (int i = 0; i < droneIds.size(); ++i) {
+				colocInterface.processImageSingle(droneIds[i]);
+				intraPoseEstimator(i, currentPoses[i], currentCov[i]);
+			}
+			updateMap(droneIds);
 
-			//colocInterface.processImages();
-			//interPoseEstimator(0, 1, pose0, poseInter, covInter);
-
-			if (colocInterface.imageNumber > 200)
-			*/
+			if (colocInterface.imageNumber == 1000)
 				stopThread = true;
 		}
 	}
@@ -136,49 +148,64 @@ public:
 
 		std::string matchesFile_putative = params.imageFolder + "matches_putative.svg";
 		std::string matchesFile_geometric = params.imageFolder + "matches_geometric.svg";
-		utils.drawMatches(matchesFile_putative, data.filenames[0], data.filenames[1], *data.regions[0].get(), *data.regions[1].get(), data.putativeMatches.at({ 0,1 }));
-		utils.drawMatches(matchesFile_geometric, data.filenames[0], data.filenames[1], *data.regions[0].get(), *data.regions[1].get(), data.geometricMatches.at({ 0,1 }));
+		utils.drawMatches(params.imageSize, matchesFile_putative, data.filenames[0], data.filenames[1], *data.regions[0].get(), *data.regions[1].get(), data.putativeMatches.at({ 0,1 }));
+		utils.drawMatches(params.imageSize, matchesFile_geometric, data.filenames[0], data.filenames[1], *data.regions[0].get(), *data.regions[1].get(), data.geometricMatches.at({ 0,1 }));
 
-		Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
+		//Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
 
 		std::cout << "Creating map" << std::endl;
-		reconstructor.reconstructScene(data, origin, scale, true);
+		reconstructor.reconstructScene(0, data, currentPoses, scale, true);
 
 		std::string mapFile = params.imageFolder + "newmap.ply";
 		logger.logMaptoPLY(data.scene, mapFile);
 		data.scene.s_root_path = params.imageFolder;
 
-		mapReady = data.setupMapDatabase();
-
+		mapReady = data.setupMapDatabase(0);
+#ifdef DEBUG
+		std::string mapFeatFile = params.imageFolder + "OriginalMap_Features.svg";
+		utils.drawFeatures(data.filenames[0], params.imageSize, data.mapRegions->Features(), mapFeatFile);
+#endif
 		for (unsigned int i = 0; i < data.numDrones; ++i) 
 			data.keyframeNames[i] = data.filenames[i];
 
-		//gpuMatcher.setTrainingMap(data.mapRegions->RegionCount(), data.mapRegions->DescriptorRawData());
+#ifdef USE_CUDA
+		matcher.setMapData(data.mapRegions->RegionCount(), const_cast<unsigned int*>(static_cast<const unsigned int*>(data.mapRegions->DescriptorRawData())));
+#endif
 	}
 
 	void intraPoseEstimator(int& droneId, Pose3& pose, Cov6& cov)
 	{
+		std::cout << colocInterface.imageNumber << std::endl;
+
 		bool locStatus = false;
 		float rmse = 10.0;
 		int nTracks;
-		IndMatches mapMatches;
+		IndMatches mapMatches, inlierMatches;
+		std::vector <uint32_t> inliers;
 		if (mapReady) {
 			matcher.matchSceneWithMap(droneId, data, mapMatches);
-			locStatus = localizer.localizeImage(droneId, pose, data, cov, rmse, mapMatches);
+			locStatus = localizer.localizeImage(droneId, pose, data, cov, rmse, mapMatches, inliers);
 		}
+		
+		
 
-		nTracks = mapMatches.size();
+		nTracks = inlierMatches.size();
 		std::cout << "Number of matches with map " << nTracks << std::endl;
+		trackCounts[droneId] = nTracks;
 
-		//std::string matchesFile = params.imageFolder + "matches.svg";
-		//std::string poseFile = params.imageFolder + "poses.txt";
-		//std::string filtPoseFile = params.imageFolder + "poses_filtered.txt";
-		// std::string mapFileName = params.imageFolder + "img__Quad" + std::to_string(droneId) + "_0000.png";  //"image (" + number + ").png";
-		// utils.drawMatches(matchesFile, fileName, mapFileName, *data.mapRegions.get(), *data.regions[0].get(), mapMatches);
+#ifdef DEBUG
+		for (int i = 0; i < inliers.size(); i++)
+			inlierMatches.push_back(mapMatches[i]);
+		std::string matchesFile = params.imageFolder + "matchesIMG" + std::to_string(colocInterface.imageNumber) + ".svg";
+		std::string number = std::string(4 - std::to_string(colocInterface.imageNumber).length(), '0') + std::to_string(colocInterface.imageNumber);
+		std::string filename = params.imageFolder + "img__Quad" + std::to_string(droneId) + "_" + number + ".png";
+		utils.drawMatches(params.imageSize, matchesFile, data.keyframeNames[0], filename, *data.mapRegions.get(), *data.regions[droneId].get(), inlierMatches);
+#endif
 
 		if (locStatus == EXIT_SUCCESS) {
 			logger.logPoseCovtoFile(imageNumber, droneId, droneId, pose, cov, rmse, nTracks, poseFile);
 			logger.logPosetoPLY(pose, mapFile);
+			filter.fillMeasurements(filter.droneMeasurements[droneId], pose.center(), pose.rotation());
 		}
 		else {
 			if (cov.size() == 0) {
@@ -187,15 +214,16 @@ public:
 				std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
 				cov.push_back(covpose);
 			}
-			logger.logPoseCovtoFile(imageNumber, droneId, droneId, Pose3(Mat3::Identity(), Vec3::Zero()), cov, rmse, nTracks, poseFile);
+
+			Pose3 failurePose = Pose3(Mat3::Identity(), Vec3::Zero());
+			logger.logPoseCovtoFile(imageNumber, droneId, droneId, failurePose, cov, rmse, nTracks, poseFile);
 		}
 
-		filter.fillMeasurements(filter.droneMeasurements[droneId], pose.center(), pose.rotation());
 		filter.update(droneId, pose);
 		logger.logPoseCovtoFile(imageNumber, droneId, droneId, pose, cov, rmse, nTracks, filtPoseFile);
 
-		currentPoses[droneId] = pose;
-		currentCov[droneId] = cov;
+		//currentPoses[droneId] = pose;
+		//currentCov[droneId] = cov;
 	}
 
 	void interPoseEstimator(int sourceId, int destId, Pose3& origin, Pose3& pose, Cov6& cov)
@@ -203,13 +231,13 @@ public:
 		std::string poseFile = params.imageFolder + "poses.txt";
 		std::string matchesFile = "matches" + std::to_string(colocInterface.imageNumber) + ".svg";
 
-		colocData tempScene;
+		// colocData tempScene;
 
-		for (auto &region : data.regions)
-			tempScene.regions.emplace_hint(tempScene.regions.end(), region.first, region.second.get());
+		//for (auto &region : data.regions)
+		//	tempScene.regions.emplace_hint(tempScene.regions.end(), region.first, region.second.get());
 
 		for (unsigned int i = 0; i < 2; ++i) {
-			tempScene.scene.views[i].reset(new View(data.filenames[i], i, 0, i, params.imageSize.first, params.imageSize.second));
+			data.tempScene.views[i].reset(new View(data.filenames[i], i, 0, i, params.imageSize.first, params.imageSize.second));
 		}
 
 		Pair interPosePair = std::make_pair <IndexT, IndexT>((IndexT)sourceId, (IndexT)destId);
@@ -217,36 +245,38 @@ public:
 		IndMatches pairMatches;
 		matcher.computeMatchesPair(interPosePair, data.regions, pairMatches);
 
-		tempScene.putativeMatches.insert({ interPosePair, std::move(pairMatches) });
-		robustMatcher.filterMatches(data.regions, tempScene.putativeMatches, tempScene.geometricMatches, tempScene.relativePoses);
+		data.putativeMatches.insert({ interPosePair, std::move(pairMatches) });
+		robustMatcher.filterMatches(data.regions, data.putativeMatches, data.geometricMatches, data.relativePoses);
 
-		utils.drawMatches(matchesFile, data.filenames[0], data.filenames[1], *data.regions[0].get(), *data.regions[1].get(), tempScene.geometricMatches.at({ 0,1 }));
+		// utils.drawMatches(matchesFile, data.filenames[0], data.filenames[1], *data.regions[0].get(), *data.regions[1].get(), data.geometricMatches.at({ 0,1 }));
 
 		std::cout << "Creating temporary map" << std::endl;
 		coloc::Reconstructor tempReconstructor(params);
 		coloc::Utils tempUtils;
-		tempReconstructor.reconstructScene(tempScene, Pose3(), 1.0, false);
+		tempReconstructor.reconstructScene(true, data, currentPoses, 1.0, false);
 
 		PoseRefiner refiner;
 		float rmse;
 		const Optimize_Options refinementOptions(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::ADJUST_ALL);
-		bool locStatus = refiner.refinePose(tempScene.scene, refinementOptions, rmse, cov);
+		bool locStatus = refiner.refinePose(data.tempScene, refinementOptions, rmse, cov);
 
-		tempScene.scene.s_root_path = params.imageFolder;
-		mapReady = tempScene.setupMapDatabase();
+		data.tempScene.s_root_path = params.imageFolder;
+
+		bool isInter = true;
+		mapReady = data.setupMapDatabase(isInter);
 
 		std::vector <IndMatch> commonFeatures;
-		robustMatcher.matchMaps(data, tempScene, commonFeatures);
+		robustMatcher.matchMaps(data.mapRegions, data.interMapRegions, commonFeatures, Vec3(), Mat3());
 		std::string matchesFileMap = params.imageFolder + "matchesMap_" + std::to_string(destId) + "_" + std::to_string(imageNumber) + ".svg";
 
-		utils.drawMatches(matchesFileMap, data.keyframeNames[0], data.filenames[0], *data.mapRegions.get(), *tempScene.mapRegions.get(), commonFeatures);
-		double scaleDiff = utils.computeScaleDifference(params, data, tempScene, commonFeatures);
+		utils.drawMatches(params.imageSize, matchesFileMap, data.keyframeNames[0], data.keyframeNames[0], *data.mapRegions.get(), *data.interMapRegions.get(), commonFeatures);
+		double scaleDiff = utils.computeScaleDifference(data.scene, data.mapRegionIdx, data.tempScene, data.interMapRegionIdx, commonFeatures);
 
 		std::cout << "Found scale difference to be " << scaleDiff << std::endl;
-		utils.rescaleMap(tempScene.scene, scaleDiff);
+		utils.rescaleMap(data.tempScene, scaleDiff);
 
 		const Optimize_Options refinementOptions2(Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::NONE);
-		locStatus = refiner.refinePose(tempScene.scene, refinementOptions2, rmse, cov);
+		locStatus = refiner.refinePose(data.tempScene, refinementOptions2, rmse, cov);
 
 		if (cov.size() == 0) {
 			double cov_pose[6 * 6] = { 1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,1 };
@@ -255,7 +285,7 @@ public:
 			cov.push_back(covpose);
 		}
 
-		pose = tempScene.scene.poses.at(1);
+		pose = data.tempScene.poses.at(1);
 		std::string newMapFile = params.imageFolder + "newmap.ply";
 		int tracks = 0;
 
@@ -292,46 +322,67 @@ public:
 	void ColoC::updateMap(std::vector <int> drones)
 	{
 		colocData updateData;
-
-		//std::string filename;
+		
+		std::string filename;
 		std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
+		updateData.filenames.clear();
 		for (unsigned int i = 0; i < drones.size(); ++i) {
-			data.filenames[i] = params.imageFolder + "img__Quad" + std::to_string(drones[i]) + "_" + number + ".png";
-			std::cout << data.filenames[i] << std::endl;
+			std::string filename = params.imageFolder + "img__Quad" + std::to_string(drones[i]) + "_" + number + ".png";
+			updateData.filenames.push_back(filename);
+			std::cout << updateData.filenames[i] << std::endl;
 
-			//detector.detectFeatures(i, updateData.regions, filename);
-			//detector.saveFeatureData(i, updateData.regions, filename);
+			detector.detectFeaturesFile(i, updateData.regions, updateData.filenames[i]);
 
-			updateData.scene.views[i].reset(new View(data.filenames[i], i, 0, i, params.imageSize.first, params.imageSize.second));
+			updateData.scene.views[i].reset(new View(updateData.filenames[i], i, 0, i, params.imageSize.first, params.imageSize.second));
 		}
-
+		
 		matcher.computeMatches(updateData.regions, updateData.putativeMatches);
 		robustMatcher.filterMatches(updateData.regions, updateData.putativeMatches, updateData.geometricMatches, updateData.relativePoses);
 
-		Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero());
+#ifdef DEBUG
+		std::string matchesFile_putative = params.imageFolder + "matches_putative_" + std::to_string(updateNum) + ".svg";
+		std::string matchesFile_geometric = params.imageFolder + "matches_geometric_" + std::to_string(updateNum) + ".svg";
+		utils.drawMatches(params.imageSize, matchesFile_putative, updateData.filenames[0], updateData.filenames[1], *updateData.regions[0].get(), *updateData.regions[1].get(), updateData.putativeMatches.at({ 0,1 }));
+		utils.drawMatches(params.imageSize, matchesFile_geometric, updateData.filenames[0], updateData.filenames[1], *updateData.regions[0].get(), *updateData.regions[1].get(), updateData.geometricMatches.at({ 0,1 }));
+#endif
 
 		std::cout << "Updating map" << std::endl;
 		Reconstructor updateReconstructor(params);
-		updateReconstructor.reconstructScene(updateData, origin, 1.0, true);
+		updateReconstructor.reconstructScene(0, updateData, currentPoses, 3.0, true);
 
-		bool newMapReady = updateData.setupMapDatabase();
-
-		if (newMapReady) {
-			std::vector <IndMatch> commonFeatures;
-			robustMatcher.matchMaps(data, updateData, commonFeatures);
-			double scaleDiff = utils.computeScaleDifference(params, data, updateData, commonFeatures);
-			std::cout << "Scale factor ratio computed during update as " << scaleDiff << std::endl;
-			utils.rescaleMap(updateData.scene, scaleDiff);
-		}
-
-		std::string newMapFile = params.imageFolder + "newmap.ply";
+		std::string newMapFile = params.imageFolder + "newmap_" + std::to_string(updateNum) + ".ply";
+		updateNum++;
 		logger.logMaptoPLY(updateData.scene, newMapFile);
 
-		data = updateData;
-		data.setupMapDatabase();
+		bool newMapReady = updateData.setupMapDatabase(0);
+#ifdef DEBUG		
+		std::string mapFeatFile = params.imageFolder + "UpdatedMap_Features.svg";
+		utils.drawFeatures(updateData.filenames[0], params.imageSize, updateData.mapRegions->Features(), mapFeatFile);
+#endif
 
-		//logger.logMaptoPLY(data.scene, mapFile);
-		//data.scene.s_root_path = params.imageFolder;
-		//mapReady = utils.setupMap(data, params);
+		if (newMapReady == EXIT_SUCCESS) {
+			std::vector <IndMatch> commonFeatures;
+
+			std::string mapmatchesFile = params.imageFolder + "mapmatches_" + std::to_string(updateNum) + ".svg";
+			matcher.matchMapFeatures(data.mapRegions, updateData.mapRegions, commonFeatures); 
+
+			Vec3 poseDiff = updateData.scene.poses[0].center() - data.scene.poses[0].center();
+			Mat3 rotDiff = updateData.scene.poses[0].rotation() - data.scene.poses[0].rotation();
+			robustMatcher.matchMaps(data.mapRegions, updateData.mapRegions, commonFeatures, poseDiff, updateData.scene.poses[0].rotation());
+			double scaleDiff = utils.computeScaleDifference(data.scene, data.mapRegionIdx, updateData.scene, updateData.mapRegionIdx, commonFeatures);
+			std::cout << "Scale factor ratio computed during update as " << scaleDiff << std::endl;
+			utils.rescaleMap(updateData.scene, scaleDiff);
+
+#ifdef DEBUG
+			utils.drawMatches(params.imageSize, mapmatchesFile, data.keyframeNames[0], updateData.filenames[0], *data.mapRegions.get(), *updateData.mapRegions.get(), commonFeatures);
+#endif
+		}
+		
+		data = updateData;
+		data.setupMapDatabase(0);
+
+#ifdef USE_CUDA
+		matcher.setMapData(data.mapRegions->RegionCount(), const_cast<unsigned int*>(static_cast<const unsigned int*>(data.mapRegions->DescriptorRawData())));
+#endif
 	}
 };

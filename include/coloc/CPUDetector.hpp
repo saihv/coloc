@@ -13,6 +13,7 @@
 
 #include "coloc/colocParams.hpp"
 #include "coloc/colocData.hpp"
+#include "coloc/AKAZE.hpp"
 
 using namespace openMVG;
 
@@ -28,7 +29,7 @@ namespace coloc
 		CPUDetector(DetectorOptions opts)
 		{
 			image_describer = features::AKAZE_Image_describer::create(features::AKAZE_Image_describer::Params(features::AKAZE::Params(), features::AKAZE_MLDB), true);
-			image_describer->Set_configuration_preset(features::ULTRA_PRESET);
+			image_describer->Set_configuration_preset(features::NORMAL_PRESET);
 		}
 
 		T detectFeaturesFile(unsigned int idx, FeatureMap &regions, std::string &imageName)
@@ -41,17 +42,18 @@ namespace coloc
 			}
 
 			//std::unique_ptr <features::Regions> regionsImage;
-			if (!image_describer->Describe(imageGray, regions[idx])) {
-				std::cout << "Feature detection failed.";
-				return EXIT_FAILURE;
-			}
+			regions[idx] = describe_AKAZE(imageGray);
+			//if (!image_describer->Describe(imageGray, regions[idx])) {
+			//	std::cout << "Feature detection failed.";
+			//	return EXIT_FAILURE;
+			//}
 
 			//regions[idx] = std::make_unique <AKAZE_Binary_Regions> (*regionsImage.get());
 			return EXIT_SUCCESS;
 		}
 
-#ifdef USE_ROS
-		bool CPUDetector::detectFeaturesTopic(unsigned int idx, FeatureMap &regions, cv_bridge::CvImagePtr imagePtr)
+#ifdef USE_STREAM
+		bool detectFeaturesTopic(unsigned int idx, FeatureMap &regions, cv_bridge::CvImagePtr imagePtr)
 		{
 
 		}

@@ -30,10 +30,9 @@ namespace coloc
 		}
 
 	private:
-		FeatureMap featureRegions;
-		std::pair<size_t, size_t> *imageSize;
-		int iterationCount = 2048;
-		Mat3 *K;
+		std::pair<int, int> *imageSize;
+		int iterationCount = 256;
+		std::vector <Mat3> *K;
 		colocParams *params;
 
 	public:
@@ -117,12 +116,37 @@ namespace coloc
 				Vec3 trn;
 
 				cv::cv2eigen(r[i], Rot);
-				trn[0] = t[i].at<double>(0, 0);
-				trn[1] = t[i].at<double>(1, 0);
-				trn[2] = t[i].at<double>(2, 0);
+				trn[0] = t[i].at<double>(0);
+				trn[1] = t[i].at<double>(1);
+				trn[2] = t[i].at<double>(2);
 
 				motions.emplace_back(Rot, trn.normalized());
 			}
+			return EXIT_SUCCESS;
+		}
+
+		bool filterFundamental(const IntrinsicBase * intrinsics1, const IntrinsicBase * intrinsics2, const Mat & x1, const Mat & x2,
+			RelativePose_Info & relativePose_info, colocParams& params, bool findPose)
+		{
+			if (!intrinsics1 || !intrinsics2)
+				return EXIT_FAILURE;
+
+			using KernelType = robust::ACKernelAdaptor<
+				openMVG::fundamental::kernel::SevenPointSolver,
+				openMVG::fundamental::kernel::EpipolarDistanceError,
+				UnnormalizerT, Mat3>;
+
+			KernelType kernel(x1, params.imageSize.first, params.imageSize.second,
+				x2, params.imageSize.first, params.imageSize.second, true);
+
+			const auto ACRansacOut = ACRANSAC(kernel, relativePose_info.vec_inliers, iterationCount, &relativePose_info.essential_matrix,
+				relativePose_info.initial_residual_tolerance, false);
+
+			relativePose_info.found_residual_precision = 5.0;
+
+			if (relativePose_info.vec_inliers.size() < 2.5 * KernelType::Solver::MINIMUM_SAMPLES)
+				return EXIT_FAILURE;
+
 			return EXIT_SUCCESS;
 		}
 
@@ -181,7 +205,9 @@ namespace coloc
 			Mat3 H = Mat3::Identity();
 			const std::pair<double, double> ACRansacOut = ACRANSAC(kernel, relativePose_info.vec_inliers, iterationCount, &relativePose_info.essential_matrix, maxPrecision);
 
-			if (relativePose_info.vec_inliers.size() < KernelType::MINIMUM_SAMPLES *2.5)
+			// relativePose_info.found_residual_precision = 5.0;
+
+			if (relativePose_info.vec_inliers.size() < KernelType::MINIMUM_SAMPLES * 2.5)
 				return EXIT_FAILURE;
 			else {
 				relativePose_info.found_residual_precision = ACRansacOut.first;
@@ -194,7 +220,7 @@ namespace coloc
 					performChiralityTest(normpt2D_1, normpt2D_2, relativePose_info.essential_matrix, relativePose_info.vec_inliers, motions, &final_pose);
 					relativePose_info.relativePose = final_pose;
 
-					std::cout << final_pose.center() << std::endl;
+					// std::cout << final_pose.center() << std::endl;
 
 					relativePose_info.found_residual_precision = ACRansacOut.first;
 					/*
@@ -212,18 +238,22 @@ namespace coloc
 			return EXIT_SUCCESS;
 		}
 
-		bool matchMaps(colocData &data1, colocData &data2, std::vector<IndMatch> &commonFeatures)
+		bool matchMaps(std::unique_ptr<features::AKAZE_Binary_Regions> &scene1, std::unique_ptr<features::AKAZE_Binary_Regions> &scene2, std::vector<IndMatch> &commonFeatures, Vec3& poseDiff, Mat3& rotDiff)
 		{
 			std::vector <IndMatch> putativeMatches, filteredMatches;
 
-			matching::DistanceRatioMatch(
-				0.8, BRUTE_FORCE_HAMMING,
-				*data1.mapRegions.get(),
-				*data2.mapRegions.get(),
-				putativeMatches);
+			putativeMatches = commonFeatures;
 
-			const PointFeatures featI = data1.mapRegions->GetRegionsPositions();
-			const PointFeatures featJ = data2.mapRegions->GetRegionsPositions();
+			commonFeatures.clear();
+
+			//matching::DistanceRatioMatch(
+			//	0.8, BRUTE_FORCE_HAMMING,
+			//	*scene1.get(),
+			//	*scene2.get(),
+			//	putativeMatches);
+			
+			const PointFeatures featI = scene1->GetRegionsPositions();
+			const PointFeatures featJ = scene2->GetRegionsPositions();
 
 			Mat xL(2, putativeMatches.size());
 			Mat xR(2, putativeMatches.size());
@@ -232,29 +262,57 @@ namespace coloc
 				xR.col(k) = featJ[putativeMatches[k].j_].coords().cast<double>();
 			}
 
+			cv::Mat xLcv, xRcv, Fcv;
+			cv::eigen2cv(xL, xLcv);
+			cv::eigen2cv(xR, xRcv);
+
+
 			RelativePose_Info relativePose;
 
-			const openMVG::cameras::Pinhole_Intrinsic
-				camL(params->imageSize.first, params->imageSize.second, (params->K[0])(0, 0), (params->K[0])(0, 2), (params->K[0])(1, 2)),
-				camR(params->imageSize.first, params->imageSize.second, (params->K[0])(0, 0), (params->K[0])(0, 2), (params->K[0])(1, 2));
+			const openMVG::cameras::Pinhole_Intrinsic_Radial_K3
+				camL(params->imageSize.first, params->imageSize.second, (params->K[0])(0, 0), (params->K[0])(0, 2), (params->K[0])(1, 2),
+				(params->dist[0])(0), (params->dist[0])(1), (params->dist[0])(2)),
+				camR(params->imageSize.first, params->imageSize.second, (params->K[0])(0, 0), (params->K[0])(0, 2), (params->K[0])(1, 2),
+				(params->dist[0])(0), (params->dist[0])(1), (params->dist[0])(2));
 
-			bool status, findPose = false;
+			Mat A;
 
-			if (params->model == 'H')
-				status = filterHomography(&camL, &camR, xL, xR, relativePose, *params, findPose);
-			else if (params->model == 'E')
-				status = filterEssential(&camL, &camR, xL, xR, relativePose, *params, findPose);
-			else {
-				std::cout << "Unknown filtering type: aborting." << std::endl;
-				return EXIT_FAILURE;
+			A = camL.K() * rotDiff * poseDiff;
+			Eigen::Matrix3d C;
+			C << 0, -A(2), A(1),
+				A(2), 0, -A(0),
+				-A(1), A(0), 0;
+
+			Eigen::Matrix3d F;
+			F = (camR.Kinv()).transpose() * rotDiff * (camL.K()).transpose() * C;
+			cv::eigen2cv(F, Fcv);
+
+			IndMatches inliers;
+			std::ofstream myfile;
+			myfile.open("guidedmatches2.txt");
+			for (size_t k = 0; k < putativeMatches.size(); ++k) {
+				Vec3 f1, f2;
+				f1 << xL(0, k), xL(1, k), 1;
+				f2 << xR(0, k), xR(1, k), 1;
+				Mat res = f1.transpose() * F * f2;
+
+				//if (std::abs(res(0, 0)) < 50.0) {
+					std::cout << "Value: " << std::abs(res(0, 0)) << std::endl;
+					std::cout << "Left coordinates: " << xL.col(k) << std::endl;
+					std::cout << "Right coordinates: " << xR.col(k) << std::endl;
+					inliers.push_back(putativeMatches[k]);
+				//}
+
+					myfile << res(0, 0) << "," << xL(0, k) << "," << xL(1, k) << "," << xR(0, k) << "," << xR(1, k) << std::endl;
+
+				std::cout << std::abs(res(0,0)) << std::endl;
 			}
-			if (status == EXIT_FAILURE)
-				std::cerr << "Unable to find any common features between maps." << std::endl;
-			else {
-				for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
-					commonFeatures.push_back(putativeMatches[relativePose.vec_inliers[ic]]);
-			}
-			commonFeatures = putativeMatches;
+			myfile.close();
+
+			for (int ic = 0; ic < inliers.size(); ++ic)
+				commonFeatures.push_back(inliers[ic]);
+			
+			return EXIT_SUCCESS;
 		}
 
 		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)
@@ -275,9 +333,11 @@ namespace coloc
 
 			RelativePose_Info relativePose;
 
-			const openMVG::cameras::Pinhole_Intrinsic
-				camL(params->imageSize.first, params->imageSize.second, (params->K[current_pair.first])(0, 0), (params->K[current_pair.first])(0, 2), (params->K[current_pair.first])(1, 2)),
-				camR(params->imageSize.first, params->imageSize.second, (params->K[current_pair.second])(0, 0), (params->K[current_pair.second])(0, 2), (params->K[current_pair.second])(1, 2));
+			const openMVG::cameras::Pinhole_Intrinsic_Radial_K3
+				camL(params->imageSize.first, params->imageSize.second, (params->K[current_pair.first])(0, 0), (params->K[current_pair.first])(0, 2), (params->K[current_pair.first])(1, 2), 
+					(params->dist[current_pair.first])(0), (params->dist[current_pair.first])(1), (params->dist[current_pair.first])(2)),
+				camR(params->imageSize.first, params->imageSize.second, (params->K[current_pair.second])(0, 0), (params->K[current_pair.second])(0, 2), (params->K[current_pair.second])(1, 2),
+					(params->dist[current_pair.second])(0), (params->dist[current_pair.second])(1), (params->dist[current_pair.second])(2));
 
 			bool status, findPose = true;
 
@@ -285,6 +345,8 @@ namespace coloc
 				status = filterHomography(&camL, &camR, xL, xR, relativePose, *params, findPose);
 			else if (params->model == 'E')
 				status = filterEssential(&camL, &camR, xL, xR, relativePose, *params, findPose);
+			else if (params->model == 'F')
+				status = filterFundamental(&camL, &camR, xL, xR, relativePose, *params, findPose);
 			else {
 				std::cout << "Unknown filtering type: aborting." << std::endl;
 			}

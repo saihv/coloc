@@ -28,13 +28,17 @@ namespace coloc
 		unsigned int imageNumber = 0;
 
 		virtual void processImageSingle(int &id) = 0;
-		virtual void processImages() = 0;
+		virtual void processImages(std::vector <int>& droneIds) = 0;
 
 	protected:
 		DetectorOptions *opts;
 		colocParams *params;
 		colocData *data;
+#ifdef USE_CUDA
+		FeatureDetector <bool, GPUDetector> detector;
+#else
 		FeatureDetector <bool, CPUDetector> detector;
+#endif
 	};
 
 }

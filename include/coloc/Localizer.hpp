@@ -31,14 +31,14 @@ namespace coloc
 		}
 
 		std::unique_ptr<features::Regions> regionsCurrent;
-		bool localizeImage(int&, Pose3&, colocData&, Cov6&, float&, IndMatches&);
+		bool localizeImage(int&, Pose3&, colocData&, Cov6&, float&, IndMatches&, std::vector<uint32_t>&);
 		bool setupTracks(cameras::Pinhole_Intrinsic_Radial_K3* cam, colocData &data, const features::Regions & queryRegions, IndMatches &trackedFeatures, Image_Localizer_Match_Data * trackPtr);
 		bool refine(int&, Pose3&, Image_Localizer_Match_Data&, Cov6&, float&);
 
 	private:
 		std::unique_ptr<features::Image_describer> image_describer;
 		EMatcherType matchingType;
-		std::pair <size_t, size_t> *imageSize;
+		std::pair <int, int> *imageSize;
 		std::vector <Mat3> *K;
 		std::string *rootFolder;
 
@@ -72,7 +72,7 @@ namespace coloc
 		return EXIT_SUCCESS;
 	}
 
-	bool Localizer::localizeImage(int& idx, Pose3& pose, colocData &data, Cov6 &covariance, float& rmse, IndMatches &trackedFeatures)
+	bool Localizer::localizeImage(int& idx, Pose3& pose, colocData &data, Cov6 &covariance, float& rmse, IndMatches &trackedFeatures, std::vector<uint32_t>& inliers)
 	{
 		using namespace openMVG::features;
 		openMVG::cameras::Pinhole_Intrinsic_Radial_K3 cam(imageSize->first, imageSize->second, (*K)[idx](0, 0), (*K)[idx](0, 2), (*K)[idx](1, 2));
@@ -95,7 +95,7 @@ namespace coloc
 			}
 			else {
 				std::cout << "Localization successful" << std::endl;
-
+				inliers = matching_data.vec_inliers;
 				if (!this->refine(idx, pose, matching_data, covariance, rmse))
 					std::cerr << "Refining pose for image failed." << std::endl;
 
@@ -146,10 +146,10 @@ namespace coloc
 		tvec.at<float>(0, 2) = pose.center()[2];
 
 		cv::Mat Kcv = cv::Mat(3, 3, CV_32FC1, cv::Scalar::all(0));
-		Kcv.at<float>(0, 0) = 320.0;
-		Kcv.at<float>(0, 2) = 320.0f;
-		Kcv.at<float>(1, 1) = 320.0f;
-		Kcv.at<float>(1, 2) = 240.0f;
+		Kcv.at<float>(0, 0) = (*K)[idx](0, 0);
+		Kcv.at<float>(0, 2) = (*K)[idx](0, 0);
+		Kcv.at<float>(1, 1) = (*K)[idx](0, 2);
+		Kcv.at<float>(1, 2) = (*K)[idx](1, 2);
 		Kcv.at<float>(2, 2) = 1.0f;
 
 		cv::Mat distcv = cv::Mat(5, 1, CV_32FC1, cv::Scalar::all(0));
@@ -168,13 +168,13 @@ namespace coloc
 		cv::Mat Sigma = cv::Mat(J.t() * J, cv::Rect(0, 0, 6, 6)).inv();
 		cv::Mat std_dev;
 		sqrt(Sigma.diag(), std_dev);
-		std::cout << "Translation standard deviation:" << std::endl << std_dev.at<double>(3, 0) << std::endl << std_dev.at<double>(4, 0) << std::endl << std_dev.at<double>(5,0) << std::endl;
+		//std::cout << "Translation standard deviation:" << std::endl << std_dev.at<double>(3, 0) << std::endl << std_dev.at<double>(4, 0) << std::endl << std_dev.at<double>(5,0) << std::endl;
 
-		std::cout << "Total standard deviation:" << std::endl << std_dev << std::endl;
+		//std::cout << "Total standard deviation:" << std::endl << std_dev << std::endl;
 
-		//poseCovariance[0][21] = std_dev.at<double>(0, 3);
-		//poseCovariance[0][28] = std_dev.at<double>(0, 4);
-		//poseCovariance[0][35] = std_dev.at<double>(0, 5);
+		poseCovariance[0][21] = std_dev.at<double>(3, 0);
+		poseCovariance[0][28] = std_dev.at<double>(4, 0);
+		poseCovariance[0][35] = std_dev.at<double>(5, 0);
 
 		return refineStatus;
 	}

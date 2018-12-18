@@ -29,7 +29,7 @@ namespace coloc
 		EMatcherType matchingType;
 
 	public:
-		CPUMatcher <typename T> (MatcherOptions &opts)
+		CPUMatcher (MatcherOptions &opts)
 		{	
 			regions_type.reset(new openMVG::features::AKAZE_Binary_Regions);
 			matchingType = BRUTE_FORCE_HAMMING;
@@ -50,6 +50,17 @@ namespace coloc
 					overlap.insert({ pairIdx, 0 });
 				}
 			}
+			return EXIT_SUCCESS;
+		}
+
+		bool matchMapFeatures(std::unique_ptr<features::AKAZE_Binary_Regions> &scene1, std::unique_ptr<features::AKAZE_Binary_Regions> &scene2, std::vector<IndMatch> &commonFeatures)
+		{
+			matching::DistanceRatioMatch(
+				0.8, BRUTE_FORCE_HAMMING,
+				*scene1.get(),
+				*scene2.get(),
+				commonFeatures);
+
 			return EXIT_SUCCESS;
 		}
 
@@ -101,5 +112,8 @@ namespace coloc
 			std::cout << "Number of tracked features: " << trackedFeatures.size() << std::endl;
 			return EXIT_SUCCESS;
 		}
+
+		void setMapData(int kpMapNum, void* desc)
+		{ }
 	};
 }

@@ -37,12 +37,19 @@ namespace coloc
 			measurements.at<double>(3) = measured_eulers.at<double>(0);      // roll
 			measurements.at<double>(4) = measured_eulers.at<double>(1);      // pitch
 			measurements.at<double>(5) = measured_eulers.at<double>(2);      // yaw
+
+			measurementsAvailable = true;
 		}
 
 		void update(int& droneId, Pose3& pose)
 		{
-			cv::Mat prediction = droneFilters[droneId].predict();
-			cv::Mat estimated = droneFilters[droneId].correct(droneMeasurements[droneId]);
+			cv::Mat predicted, estimated; 
+			predicted = droneFilters[droneId].predict();
+
+			if (measurementsAvailable)
+				estimated = droneFilters[droneId].correct(droneMeasurements[droneId]);
+			else
+				estimated = predicted;
 
 			Vec3 t;
 			t[0] = estimated.at<double>(0);
@@ -60,19 +67,21 @@ namespace coloc
 			cv::cv2eigen(Rcv, R);
 
 			pose = Pose3(R, t);
+			measurementsAvailable = false;
 		}
 
 	private:
 		int nStates = 18;            
 		int nMeasurements = 6;       
 		int nInputs = 0;             
-		double dt = 0.125;           
+		double dt = 0.125;   
+		bool measurementsAvailable;
 
 		void initKalmanFilter(cv::KalmanFilter &KF, int nStates, int nMeasurements, int nInputs, double dt)
 		{
 			KF.init(nStates, nMeasurements, nInputs, CV_64F);                 // init Kalman Filter
 			cv::setIdentity(KF.processNoiseCov, cv::Scalar::all(1e-5));       // set process noise
-			cv::setIdentity(KF.measurementNoiseCov, cv::Scalar::all(1e-2));   // set measurement noise
+			cv::setIdentity(KF.measurementNoiseCov, cv::Scalar::all(1e-3));   // set measurement noise
 			cv::setIdentity(KF.errorCovPost, cv::Scalar::all(1));             // error covariance
 
 			KF.transitionMatrix.at<double>(0, 3) = dt;

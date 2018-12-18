@@ -21,7 +21,7 @@ namespace coloc
     class colocParams {
     public:
         std::string imageFolder;
-        std::pair <size_t, size_t> imageSize;
+        std::pair <int, int> imageSize;
 		std::vector <Mat3> K;
         std::vector <Vec3> dist;
         char model;

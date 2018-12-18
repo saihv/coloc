@@ -33,9 +33,9 @@ namespace coloc
     private:
         struct CeresOptions
         {
-            bool bVerbose_ = true;
+            bool bVerbose_ = false;
             unsigned int nb_threads_ = 4;
-            bool bCeres_summary_ = true;
+            bool bCeres_summary_ = false;
             int linear_solver_type_ = ceres::SPARSE_SCHUR;
             int preconditioner_type_ = ceres::JACOBI;
             int sparse_linear_algebra_library_type_ = ceres::CX_SPARSE;

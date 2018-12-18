@@ -43,7 +43,7 @@ namespace coloc
                   currentFolder(&params.imageFolder)
         {	}
 
-        void reconstructScene(colocData& data, Pose3, float, bool);
+        void reconstructScene(bool inter, colocData& data, std::vector <Pose3>, float, bool);
 
     private:
         // Internal methods
@@ -62,7 +62,7 @@ namespace coloc
         openMVG::tracks::STLMAPTracks mapTracks, mapTracksCommon;
         std::unique_ptr<openMVG::tracks::SharedTrackVisibilityHelper> trackVisibility;
         cameras::Pinhole_Intrinsic *camCurrent, *cam_J;
-        std::pair <size_t, size_t> *imageSize;
+        std::pair <int, int> *imageSize;
         std::vector <Mat3> *K;
 		std::vector <Vec3> *dist;
         std::string *currentFolder;
@@ -70,18 +70,22 @@ namespace coloc
 
         // Local pointers to external localization data
 
-        std::map<IndexT, std::unique_ptr<features::Regions> > * regionsRCT;
+        FeatureMap * regionsRCT;
         PairWiseMatches* matchesRCT;
         std::map<Pair, RelativePose_Info > * relativePosesRCT;
         Scene* scene;
     };
 
-    void Reconstructor::reconstructScene(colocData& data, Pose3 origin = Pose3(Mat3::Identity(), Vec3::Zero()), float scale = 1.0, bool Adjust = false)
+    void Reconstructor::reconstructScene(bool inter, colocData& data, std::vector <Pose3> poses, float scale = 1.0, bool Adjust = false)
     {
         this->regionsRCT = &data.regions;
         this->matchesRCT = &data.geometricMatches;
         this->relativePosesRCT = &data.relativePoses;
-        this->scene = &data.scene;
+
+		if (inter)
+			this->scene = &data.tempScene;
+		else
+			this->scene = &data.scene;
 
         int maxMatches = 0;
         Pair seedPair;
@@ -108,6 +112,8 @@ namespace coloc
 
         initializeTracks(seedPair);
         initializeScene(imageSize->first, imageSize->second, seedPair);
+
+		Pose3 origin = poses[seedPair.first];
         std::cout << "Triangulating feature matches... ";
         triangulatePoints(seedPair, origin, scale);
         std::cout << "Done." << std::endl;
@@ -141,7 +147,8 @@ namespace coloc
     void Reconstructor::initializeScene(int w, int h, Pair& seedPair)
     {
         for (int camId = 0; camId < K->size(); camId++)
-			this->scene->intrinsics[camId].reset(new cameras::Pinhole_Intrinsic_Radial_K3(w, h, (*K)[camId](0, 0), (*K)[camId](0, 2), (*K)[camId](1, 2), (*dist)[camId](0), (*dist)[camId](1), (*dist)[camId](2)));
+			this->scene->intrinsics[camId].reset(new cameras::Pinhole_Intrinsic_Radial_K3(w, h, (*K)[camId](0, 0), (*K)[camId](0, 2), (*K)[camId](1, 2), 
+																								(*dist)[camId](0), (*dist)[camId](1), (*dist)[camId](2)));
 
         this->camCurrent = dynamic_cast<cameras::Pinhole_Intrinsic*> (scene->intrinsics[seedPair.first].get());
         this->cam_J = dynamic_cast<cameras::Pinhole_Intrinsic*> (scene->intrinsics[seedPair.second].get());
@@ -180,7 +187,7 @@ namespace coloc
             Pose3 Pose_I = scene->poses[scene->views[pair.first]->id_pose] = origin;
 
             Mat3 Rrelative = relativePosesRCT->at(pair).relativePose.rotation();
-            Vec3 Trelative = relativePosesRCT->at(pair).relativePose.translation();
+            Vec3 Trelative = relativePosesRCT->at(pair).relativePose.center();
             Pose3 relativePose = Pose3(Rrelative, scale*Trelative);
 
             Pose3 Pose_J = scene->poses[scene->views[pair.second]->id_pose] = relativePoseToAbsolute(origin, relativePose);
@@ -214,8 +221,8 @@ namespace coloc
         Mat3 R1 = origin.rotation();
         Mat3 R2 = relativePose.rotation();
         Mat3 Rfinal = R2*R1;
-        Vec3 t1 = origin.translation();
-        Vec3 t2 = relativePose.translation();
+        Vec3 t1 = origin.center();
+        Vec3 t2 = relativePose.center();
         Vec3 tfinal = t1 + t2;
 
         return Pose3(Rfinal, tfinal);

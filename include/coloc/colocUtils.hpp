@@ -25,11 +25,13 @@ namespace coloc
 	class Utils
 	{
 	public:
-		double computeScaleDifference(colocParams& params, colocData &data1, colocData &data2, std::vector<IndMatch> commonFeatures);
+		double computeScaleDifference(Scene &scene1, std::vector <IndexT> &idx1, Scene &scene2, std::vector <IndexT> &idx2, std::vector<IndMatch> commonFeatures);
 		bool matchSceneWithMap(Scene& scene);
 		bool rescaleMap(Scene& scene, double scale);
 		int drawFeaturePoints(std::string& imageName, features::PointFeatures points);
-		bool drawMatches(std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches);
+		bool drawFeatures(std::string& image, std::pair <int, int>& imageSize, features::SIOPointFeatures& features, std::string& outputFilename, const double feature_circle_radius,
+			const double stroke_size);
+		bool drawMatches(std::pair <int, int>& imageSize, std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches);
 
 		void loadPoseCovariance(Cov6& cov, matrix<double, 3, 3>& covNew)
 		{
@@ -143,16 +145,43 @@ namespace coloc
 		EMatcherType matchingType;
 	};
 
-	bool Utils::drawMatches(std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches)
+	bool Utils::drawMatches(std::pair <int, int>& imageSize, std::string& outputFilename, std::string& image1, std::string& image2, Regions& regions1, Regions& regions2, std::vector <IndMatch>& matches)
 	{
 		Matches2SVG(
-			image1, { 1280, 720 }, regions1.GetRegionsPositions(),
-			image2, { 1280, 720 }, regions2.GetRegionsPositions(),
+			image1, { imageSize.first, imageSize.second }, regions1.GetRegionsPositions(),
+			image2, { imageSize.first, imageSize.second }, regions2.GetRegionsPositions(),
 			matches, outputFilename, true);
 		return EXIT_SUCCESS;
 	}
 
-	double Utils::computeScaleDifference(colocParams& params, colocData &data1, colocData &data2, std::vector<IndMatch> commonFeatures)
+	bool Utils::drawFeatures(std::string& image, std::pair <int, int>& imageSize, features::SIOPointFeatures& features, std::string& outputFilename, const double feature_circle_radius = 3.0,
+		const double stroke_size = 3.0)
+	{
+		svg::svgDrawer svgStream(imageSize.first, imageSize.second);
+
+		// Draw image
+		svgStream.drawImage(image, imageSize.first, imageSize.second);
+
+		// Draw features
+		for (const features::PointFeature & feat_it : features) {
+			// Draw the feature (circle)
+			svgStream.drawCircle(
+				feat_it.x(), feat_it.y(), feature_circle_radius,
+				svg::svgStyle().stroke("green", stroke_size));
+		}
+
+		// Save the SVG file
+		std::ofstream svgFile(outputFilename.c_str());
+		if (svgFile.is_open())
+		{
+			svgFile << svgStream.closeSvgFile().str();
+			svgFile.close();
+			return true;
+		}
+		return false;
+	}
+
+	double Utils::computeScaleDifference(Scene &scene1, std::vector <IndexT> &idx1, Scene &scene2, std::vector <IndexT> &idx2, std::vector<IndMatch> commonFeatures)
 	{
 		if (commonFeatures.empty()) {
 			std::cout << "No common features between the maps." << std::endl;
@@ -174,19 +203,18 @@ namespace coloc
 		}
 		*/
 		for (size_t i = 0; i < commonFeatures.size() - 1; ++i) {
-			Vec3 X11 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
-			Vec3 X12 = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i + 1].i_]).X;
+			Vec3 X11 = scene1.GetLandmarks().at(idx1[commonFeatures[i].i_]).X;
+			Vec3 X12 = scene1.GetLandmarks().at(idx1[commonFeatures[i + 1].i_]).X;
 
-			Vec3 X21 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i].j_]).X;
-			Vec3 X22 = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i + 1].j_]).X;
+			Vec3 X21 = scene2.GetLandmarks().at(idx2[commonFeatures[i].j_]).X;
+			Vec3 X22 = scene2.GetLandmarks().at(idx2[commonFeatures[i + 1].j_]).X;
 
 			float dist1 = (X12 - X11).norm();
 			float dist2 = (X22 - X21).norm();
 
 			scale += dist1 / dist2;
 
-			std::cout << dist1 << std::endl;
-			std::cout << dist2 << std::endl;
+			std::cout << dist1/dist2 << std::endl;
 		}
 
 		scaleDiff = scale / (commonFeatures.size() - 1);
@@ -200,7 +228,7 @@ namespace coloc
 		}
 
 		for (unsigned int i = 0; i < scene.poses.size(); ++i) {
-			scene.poses[i] = Pose3(scene.poses.at(i).rotation(), scene.poses.at(i).center() * scale);
+			scene.poses[i] = Pose3(scene.poses.at(i).rotation(), scene.poses.at(i).translation() * scale);
 		}
 		return EXIT_SUCCESS;
 	}

@@ -15,13 +15,13 @@ namespace coloc
 			detector.detectFeaturesFile(id, data->regions, data->filenames[id]);
 		}
 
-		void processImages() override
+		void processImages(std::vector <int>& droneIds) override
 		{
 			std::vector <std::string> filename;
 			std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 			auto start = std::chrono::system_clock::now();
-			for (unsigned int i = 0; i < data->numDrones; ++i) {
-				data->filenames[i] = params->imageFolder + "img__Quad" + std::to_string(i) + "_" + number + ".png";
+			for (unsigned int i = 0; i < droneIds.size(); ++i) {
+				data->filenames[i] = params->imageFolder + "img__Quad" + std::to_string(droneIds[i]) + "_" + number + ".png";
 				std::cout << data->filenames[i] << std::endl;
 
 				detector.detectFeaturesFile(i, data->regions, data->filenames[i]);

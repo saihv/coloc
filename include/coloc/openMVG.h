@@ -41,6 +41,7 @@
 #include "openMVG/sfm/sfm_data_io.hpp"
 #include "openMVG/stl/stl.hpp"
 #include "openMVG/multiview/triangulation.hpp"
+#include "openMVG/features/svg_features.hpp"
 
 #include "third_party/cmdLine/cmdLine.h"
 #include "third_party/stlplus3/filesystemSimplified/file_system.hpp"
