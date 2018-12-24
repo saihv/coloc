@@ -81,23 +81,28 @@ namespace coloc
         this->regionsRCT = &data.regions;
         this->matchesRCT = &data.geometricMatches;
         this->relativePosesRCT = &data.relativePoses;
+		Pose3 origin;
 
-		if (inter)
+		int maxMatches = 0;
+		Pair seedPair;
+
+		for (auto matchedPair : *matchesRCT) {
+			Pair currentPair = matchedPair.first;
+			if (matchedPair.second.size() > maxMatches) {
+				maxMatches = matchedPair.second.size();
+				seedPair = currentPair;
+			}
+		}
+
+		if (inter) {
 			this->scene = &data.tempScene;
-		else
+			origin = Pose3(Mat3::Identity(), Vec3::Zero());
+		}
+		else {
 			this->scene = &data.scene;
-
-        int maxMatches = 0;
-        Pair seedPair;
-
-        for (auto matchedPair : *matchesRCT) {
-            Pair currentPair = matchedPair.first;
-            if (matchedPair.second.size() > maxMatches) {
-                maxMatches = matchedPair.second.size();
-                seedPair = currentPair;
-            }
-        }
-
+			origin = poses[seedPair.first];
+		}
+		
 		std::cout << "Using pair " << seedPair.first << " & " << seedPair.second << "as seed" << std::endl;
 
 		data.keyframeIdx = seedPair.first;
@@ -113,7 +118,6 @@ namespace coloc
         initializeTracks(seedPair);
         initializeScene(imageSize->first, imageSize->second, seedPair);
 
-		Pose3 origin = poses[seedPair.first];
         std::cout << "Triangulating feature matches... ";
         triangulatePoints(seedPair, origin, scale);
         std::cout << "Done." << std::endl;

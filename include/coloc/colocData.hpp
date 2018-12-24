@@ -88,7 +88,7 @@ namespace coloc
 
         bool setupMapDatabase(bool inter)
         {
-			mapRegions.reset(new AKAZE_Binary_Regions);
+			//mapRegions.reset(new AKAZE_Binary_Regions);
 			Scene *map;
 			std::vector <IndexT> *indexes;
 			std::unique_ptr<features::AKAZE_Binary_Regions> *features;
@@ -104,12 +104,14 @@ namespace coloc
 				features = &this->mapRegions;
 			}
 
+			features->reset(new AKAZE_Binary_Regions);
+
 			for (const auto &landmark : map->GetLandmarks()) {
 				const auto &observation = landmark.second.obs.begin();
 				//for (const auto &observation : landmark.second.obs) {
 					if (observation->second.id_feat != UndefinedIndexT) {
 						regions.at(observation->first)->CopyRegion(observation->second.id_feat, features->get());
-						mapRegionIdx.push_back(landmark.first);
+						indexes->push_back(landmark.first);
 					}
 				//}
 			}

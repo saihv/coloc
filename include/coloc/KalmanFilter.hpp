@@ -41,15 +41,19 @@ namespace coloc
 			measurementsAvailable = true;
 		}
 
-		void update(int& droneId, Pose3& pose)
+		void update(int& droneId, Pose3& pose, float& rmse)
 		{
 			cv::Mat predicted, estimated; 
 			predicted = droneFilters[droneId].predict();
 
-			if (measurementsAvailable)
+			cv::setIdentity(droneFilters[droneId].measurementNoiseCov, cv::Scalar::all(rmse/1000));
+
+			if (measurementsAvailable) {
 				estimated = droneFilters[droneId].correct(droneMeasurements[droneId]);
+				bool reject = chiSquareGating(droneId, droneMeasurements[droneId], predicted);
+			}
 			else
-				estimated = predicted;
+				estimated = predicted;			
 
 			Vec3 t;
 			t[0] = estimated.at<double>(0);
@@ -110,6 +114,41 @@ namespace coloc
 			KF.measurementMatrix.at<double>(3, 9) = 1;  // roll
 			KF.measurementMatrix.at<double>(4, 10) = 1; // pitch
 			KF.measurementMatrix.at<double>(5, 11) = 1; // yaw
+		}
+
+		bool chiSquareGating(int& droneId, cv::Mat& estimated, cv::Mat& predicted)
+		{
+			cv::Mat innv(6, 1, CV_64FC1);
+			cv::Mat mDist(1, 1, CV_64FC1);
+			cv::Mat S;
+
+			innv.at<double>(0, 0) = estimated.at<double>(0) - predicted.at<double>(0);
+			innv.at<double>(1, 0) = estimated.at<double>(1) - predicted.at<double>(1);
+			innv.at<double>(2, 0) = estimated.at<double>(2) - predicted.at<double>(2);
+			innv.at<double>(3, 0) = estimated.at<double>(3) - predicted.at<double>(3);
+			innv.at<double>(4, 0) = estimated.at<double>(4) - predicted.at<double>(4);
+			innv.at<double>(5, 0) = estimated.at<double>(5) - predicted.at<double>(5);
+
+			S = (droneFilters[droneId].measurementMatrix * droneFilters[droneId].errorCovPre * droneFilters[droneId].measurementMatrix.t()) + droneFilters[droneId].measurementNoiseCov;
+
+			mDist = innv.t() * S * innv;
+
+			Eigen::MatrixXd Seig, innveig, estimateeig;
+
+			cv::cv2eigen(S, Seig);
+			cv::cv2eigen(innv, innveig);
+			cv::cv2eigen(estimated, estimateeig);
+
+			std::cout << mDist.at<double>(0, 0) << std::endl;
+
+			std::ofstream myfile;
+			myfile.open("mahalanobis.txt", std::ios_base::app);
+
+			myfile << droneId << "," << mDist.at<double>(0,0) << std::endl;
+
+			myfile.close();
+
+			return true;
 		}
 	};
 }

@@ -72,7 +72,9 @@ int main(int argc, char **argv)
 		//std::string imageFolder = "C:\\Datasets\\coloc\\AirSim\\3straight\\2018-09-21-16-23-05\\images\\";
 		//std::string imageFolder = "C:\\Datasets\\coloc\\AirSim\\updateTest\\";
 		//std::string imageFolder = "C:\\Datasets\\12_10\\outdoor\\";
-		std::string imageFolder = "C:\\Datasets\\12_16\\ut_shortBaseline\\";
+		//std::string imageFolder = "C:\\Datasets\\12_16\\ut_shortBaseline\\";
+		//std::string imageFolder = "C:\\Datasets\\12_21\\test\\";
+		std::string imageFolder = "C:\\Datasets\\AirSim\\interTest3\\";
 		std::string calibFilename = imageFolder + "calib.txt";
 
 		readCalibData(imageSize, K, dist, calibFilename, numDrones);

@@ -31,7 +31,7 @@ namespace coloc
 
 	private:
 		std::pair<int, int> *imageSize;
-		int iterationCount = 256;
+		int iterationCount = 4096;
 		std::vector <Mat3> *K;
 		colocParams *params;
 
@@ -277,7 +277,7 @@ namespace coloc
 
 			Mat A;
 
-			A = camL.K() * rotDiff * poseDiff;
+			A = camL.K() * rotDiff * (poseDiff/poseDiff.norm());
 			Eigen::Matrix3d C;
 			C << 0, -A(2), A(1),
 				A(2), 0, -A(0),
@@ -289,28 +289,40 @@ namespace coloc
 
 			IndMatches inliers;
 			std::ofstream myfile;
-			myfile.open("guidedmatches2.txt");
+
+			std::vector <double> epipolarLineDeviations;
+			myfile.open("guidedmatches2.txt", std::ios_base::app);
 			for (size_t k = 0; k < putativeMatches.size(); ++k) {
 				Vec3 f1, f2;
 				f1 << xL(0, k), xL(1, k), 1;
 				f2 << xR(0, k), xR(1, k), 1;
 				Mat res = f1.transpose() * F * f2;
-
-				//if (std::abs(res(0, 0)) < 50.0) {
+				/*
+				if (std::abs(res(0, 0)) < 50.0) {
 					std::cout << "Value: " << std::abs(res(0, 0)) << std::endl;
 					std::cout << "Left coordinates: " << xL.col(k) << std::endl;
 					std::cout << "Right coordinates: " << xR.col(k) << std::endl;
-					inliers.push_back(putativeMatches[k]);
-				//}
-
-					myfile << res(0, 0) << "," << xL(0, k) << "," << xL(1, k) << "," << xR(0, k) << "," << xR(1, k) << std::endl;
-
+					
+				}
+				*/
+				inliers.push_back(putativeMatches[k]);
+				myfile << res(0, 0) << "," << xL(0, k) << "," << xL(1, k) << "," << xR(0, k) << "," << xR(1, k) << std::endl;
+				epipolarLineDeviations.push_back(std::abs(res(0, 0)));
 				std::cout << std::abs(res(0,0)) << std::endl;
 			}
 			myfile.close();
 
-			for (int ic = 0; ic < inliers.size(); ++ic)
-				commonFeatures.push_back(inliers[ic]);
+			std::vector<int> matchIndices(epipolarLineDeviations.size());
+			std::size_t n(0);
+			std::generate(std::begin(matchIndices), std::end(matchIndices), [&] { return n++; });
+
+			std::sort(std::begin(matchIndices), std::end(matchIndices), [&](int i1, int i2) { return epipolarLineDeviations[i1] < epipolarLineDeviations[i2]; });
+			std::sort(epipolarLineDeviations.begin(), epipolarLineDeviations.end());
+			//for (int ic = 0; ic < inliers.size(); ++ic)
+			//	commonFeatures.push_back(inliers[ic]);
+
+			for (int ic = 0; ic < 2; ic++)
+				commonFeatures.push_back(putativeMatches[matchIndices[ic]]);
 			
 			return EXIT_SUCCESS;
 		}
@@ -379,9 +391,18 @@ namespace coloc
 					vec_geometricMatches.push_back(pairMatches[relativePose->vec_inliers[ic]]);
 
 				if (!vec_geometricMatches.empty())
-					geometricMatches.insert({ { currentPair.first, currentPair.second }, std::move(vec_geometricMatches) });
+				{
+					PairWiseMatches::iterator it = geometricMatches.find(currentPair);
+					if (geometricMatches.end() != it)
+						geometricMatches.at(currentPair) = vec_geometricMatches;
+					else
+						geometricMatches.insert({ { currentPair.first, currentPair.second }, std::move(vec_geometricMatches) });
+				}
 
-				relativePoses.insert({ currentPair, *relativePose });
+				if (relativePoses.empty())
+					relativePoses.insert({ currentPair, *relativePose });
+				else
+					relativePoses.at(currentPair) = *relativePose;
 			}
 		}
 	};

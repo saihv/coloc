@@ -27,6 +27,7 @@ namespace coloc
 
 			this->imageSize = &params.imageSize;
 			this->K = &params.K;
+			this->dist = &params.dist;
 			this->rootFolder = &params.imageFolder;
 		}
 
@@ -40,6 +41,7 @@ namespace coloc
 		EMatcherType matchingType;
 		std::pair <int, int> *imageSize;
 		std::vector <Mat3> *K;
+		std::vector <Vec3> *dist;
 		std::string *rootFolder;
 
 		Scene *scenePtr;
@@ -75,7 +77,7 @@ namespace coloc
 	bool Localizer::localizeImage(int& idx, Pose3& pose, colocData &data, Cov6 &covariance, float& rmse, IndMatches &trackedFeatures, std::vector<uint32_t>& inliers)
 	{
 		using namespace openMVG::features;
-		openMVG::cameras::Pinhole_Intrinsic_Radial_K3 cam(imageSize->first, imageSize->second, (*K)[idx](0, 0), (*K)[idx](0, 2), (*K)[idx](1, 2));
+		openMVG::cameras::Pinhole_Intrinsic_Radial_K3 cam(imageSize->first, imageSize->second, (*K)[idx](0, 0), (*K)[idx](0, 2), (*K)[idx](1, 2), (*dist)[idx](0), (*dist)[idx](1), (*dist)[idx](2));
 		
 		Image_Localizer_Match_Data matching_data;
 		matching_data.error_max = std::numeric_limits<double>::infinity();
@@ -113,7 +115,7 @@ namespace coloc
 		std::vector <cv::Point2f> imagePoints;
 		scene.views.insert({ 0, std::make_shared<View>("",0, 0, 0) });
 		scene.poses[0] = pose;
-		const openMVG::cameras::Pinhole_Intrinsic cam(imageSize->first, imageSize->second, (*K)[idx](0, 0), (*K)[idx](0, 2), (*K)[idx](1, 2));
+		const openMVG::cameras::Pinhole_Intrinsic_Radial_K3 cam(imageSize->first, imageSize->second, (*K)[idx](0, 0), (*K)[idx](0, 2), (*K)[idx](1, 2), (*dist)[idx](0), (*dist)[idx](1), (*dist)[idx](2));
 		std::shared_ptr<cameras::IntrinsicBase> shared_intrinsics(cam.clone());
 		scene.intrinsics[0] = shared_intrinsics;
 
