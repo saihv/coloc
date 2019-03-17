@@ -44,7 +44,6 @@ namespace coloc
         {	}
 
         void reconstructScene(bool inter, colocData& data, std::vector <Pose3>, float, bool);
-		void Reconstructor::interReconstruct(int sourceId, int destId, colocData& data);
 
     private:
         // Internal methods
@@ -76,28 +75,6 @@ namespace coloc
         std::map<Pair, RelativePose_Info > * relativePosesRCT;
         Scene* scene;
     };
-
-	void Reconstructor::interReconstruct(int sourceId, int destId, colocData& data)
-	{
-		this->regionsRCT = &data.regions;
-		this->matchesRCT = &data.geometricMatches;
-		this->relativePosesRCT = &data.relativePoses;
-		this->scene = &data.tempScene;
-
-		float scale = 1.0;
-		Pair seedPair = std::make_pair(sourceId, destId);
-
-		std::cout << "Using pair " << seedPair.first << " & " << seedPair.second << "as seed" << std::endl;
-
-		data.keyframeIdx = seedPair.first;
-		initializeTracks(seedPair);
-		initializeScene(imageSize->first, imageSize->second, seedPair);
-
-		std::cout << "Triangulating feature matches... ";
-        Pose3 tempOrigin = Pose3(Mat3::Identity(), Vec3::Zero());
-		triangulatePoints(seedPair, tempOrigin, scale);
-		std::cout << "Done." << std::endl;
-	}
 
     void Reconstructor::reconstructScene(bool inter, colocData& data, std::vector <Pose3> poses, float scale = 1.0, bool Adjust = false)
     {
@@ -145,20 +122,19 @@ namespace coloc
         triangulatePoints(seedPair, origin, scale);
         std::cout << "Done." << std::endl;
 
-		std::string initialMap = "initial.ply";
-		saveSceneData(this->scene, initialMap);
         const Optimize_Options ba_refine_options
                 (cameras::Intrinsic_Parameter_Type::NONE, Extrinsic_Parameter_Type::ADJUST_ALL, Structure_Parameter_Type::ADJUST_ALL);
        
 		for (auto resectionId : resectionList)
 			resectionCamera(resectionId);
 
-		std::string refinedMap = "refined.ply";
+		std::string initialMap = "initial.ply";
+        std::string refinedMap = "refined.ply";
+        saveSceneData(this->scene, initialMap);
         std::cout << "Refining scene...";
         float rmse;
-        Cov6 cov;
         if(Adjust)
-            refiner.refinePose(*scene, ba_refine_options, rmse, cov);
+            refiner.refinePose(*scene, ba_refine_options, rmse);
         std::cout << "Done." << std::endl;
         saveSceneData(this->scene, refinedMap);
     }
@@ -207,8 +183,8 @@ namespace coloc
             const uint32_t i = iter->second;
             const uint32_t j = (++iter)->second;
 
-            const Vec2 x1_ = camCurrent->get_ud_pixel(regionsRCT->at(pair.first)->GetRegionsPositions()[i].coords().cast<double>());
-            const Vec2 x2_ = cam_J->get_ud_pixel(regionsRCT->at(pair.second)->GetRegionsPositions()[j].coords().cast<double>());
+            const Vec2 x1_ = regionsRCT->at(pair.first)->GetRegionsPositions()[i].coords().cast<double>();
+            const Vec2 x2_ = regionsRCT->at(pair.second)->GetRegionsPositions()[j].coords().cast<double>();
 
             Vec3 X;
 
@@ -227,7 +203,7 @@ namespace coloc
 			if (Pose_I.depth(X) < 0 && Pose_J.depth(X) < 0)
 				continue;
 
-			if (std::abs(X[2]) > 100.0)
+			if (std::abs(X[2]) > 1000.0)
 				continue;
 
             Observations obs;

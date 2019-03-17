@@ -16,7 +16,7 @@ using namespace openMVG::sfm;
 
 namespace coloc
 {
-    typedef std::array<double, 6 * 6> Cov6;
+    typedef std::vector<std::array<double, 6 * 6>> Cov6;
 #ifdef USE_CUDA
 	typedef std::map<IndexT, std::unique_ptr<AKAZE_Binary_Regions> > FeatureMap;
 #else
@@ -92,8 +92,6 @@ namespace coloc
 			Scene *map;
 			std::vector <IndexT> *indexes;
 			std::unique_ptr<features::AKAZE_Binary_Regions> *features;
-
-			interMapRegionIdx.clear();
 
 			if (inter) {
 				map = &this->tempScene;

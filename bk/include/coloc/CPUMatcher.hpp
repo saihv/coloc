@@ -64,8 +64,24 @@ namespace coloc
 			return EXIT_SUCCESS;
 		}
 
-		bool computeMatchesPair(const Pair& pairIdx, FeatureMap& regions, IndMatches& putativeMatches, float distRatio = 0.8f)
-		{
+		bool computeMatchesPair(const Pair& pairIdx, FeatureMap& regions, IndMatches& putativeMatches, float distRatio = 0.8f) {
+			/*
+			featFile = stlplus::create_filespec(baseDir.c_str(), imagePath1.c_str(), ".feat");
+			descFile = stlplus::create_filespec(baseDir.c_str(), imagePath1.c_str(), ".desc");
+
+			std::unique_ptr<features::Regions> regions_ptr1(regions_type->EmptyClone());
+			std::unique_ptr<features::Regions> regions_ptr2(regions_type->EmptyClone());
+			if (!regions_ptr1->Load(featFile, descFile))
+				std::cerr << "Invalid regions files for the view: " << std::endl;
+
+			featFile = stlplus::create_filespec(baseDir.c_str(), imagePath2.c_str(), ".feat");
+			descFile = stlplus::create_filespec(baseDir.c_str(), imagePath2.c_str(), ".desc");
+
+			if (!regions_ptr2->Load(featFile, descFile))
+				std::cerr << "Invalid regions files for the view: " << std::endl;
+			*/
+			//std::vector<IndMatch> vec_PutativeMatches;
+
 			matching::DistanceRatioMatch(
 				distRatio, this->matchingType,
 				*regions.at(pairIdx.first).get(),

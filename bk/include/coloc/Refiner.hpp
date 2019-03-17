@@ -33,7 +33,7 @@ namespace coloc
     private:
         struct CeresOptions
         {
-            bool bVerbose_ = true;
+            bool bVerbose_ = false;
             unsigned int nb_threads_ = 4;
             bool bCeres_summary_ = false;
             int linear_solver_type_ = ceres::SPARSE_SCHUR;
@@ -44,7 +44,7 @@ namespace coloc
         } ceresOptions;
     };
 
-    bool PoseRefiner::refinePose(SfM_Data &scene, const Optimize_Options options, float& rmse, std::array<double, 6 * 6> &poseCovariance)
+    bool PoseRefiner::refinePose(SfM_Data &scene, const Optimize_Options options, float& rmse, std::vector<std::array<double, 6 * 6> > &poseCovariance = std::vector<std::array<double, 36> >())
     {
         ceres::Problem problem;
 
@@ -181,19 +181,15 @@ namespace coloc
                     std::array<double, 6 * 6> covpose;
                     double cov_pose[6 * 6];
                     covariance.GetCovarianceBlock(poseParameter[1], poseParameter[1], cov_pose);
-
                     std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
-                    poseCovariance = covpose;
-					//std::for_each(covpose.begin(), covpose.end(), [](double &el) {el *= 0.001; });
-                    //poseCovariance.push_back(covpose);
+                    poseCovariance.push_back(covpose);
                 }
                 else {
                     std::array<double, 6 * 6> covpose;
                     double cov_pose[6 * 6];
                     covariance.GetCovarianceBlock(poseParameter[0], poseParameter[0], cov_pose);
                     std::copy(std::begin(cov_pose), std::end(cov_pose), std::begin(covpose));
-                    //poseCovariance.push_back(covpose);
-                    poseCovariance = covpose;
+                    poseCovariance.push_back(covpose);
                 }
             }
             catch (std::exception &e) {

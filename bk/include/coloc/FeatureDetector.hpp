@@ -26,12 +26,12 @@ public:
 	
 	}
 
-	T detectFeaturesFile(unsigned int idx, coloc::FeatureMap &regions, std::string &imageName)
+	bool detectFeaturesFile(unsigned int idx, coloc::FeatureMap &regions, std::string &imageName)
 	{
 		return ProcessorType<T>::detectFeaturesFile(idx, regions, imageName);
 	}
 
-#ifdef USE_STREAM
-    virtual void detectFeaturesTopic(uint8_t, coloc::FeatureMap&, cv_bridge::CvImagePtr);
+#ifdef USE_ROS
+    virtual void detectFeaturesTopic(uint8_t, coloc::FeatureMap&, cv_bridge::CvImagePtr) = 0;
 #endif
 };

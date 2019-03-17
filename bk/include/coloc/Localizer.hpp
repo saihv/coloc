@@ -143,14 +143,14 @@ namespace coloc
 		cv::eigen2cv(pose.rotation(), rvec);
 		cv::Mat tvec = cv::Mat(1, 3, CV_32FC1, cv::Scalar::all(0));
 
-		tvec.at<float>(0, 0) = pose.translation()[0];
-		tvec.at<float>(0, 1) = pose.translation()[1];
-		tvec.at<float>(0, 2) = pose.translation()[2];
+		tvec.at<float>(0, 0) = pose.center()[0];
+		tvec.at<float>(0, 1) = pose.center()[1];
+		tvec.at<float>(0, 2) = pose.center()[2];
 
 		cv::Mat Kcv = cv::Mat(3, 3, CV_32FC1, cv::Scalar::all(0));
 		Kcv.at<float>(0, 0) = (*K)[idx](0, 0);
-		Kcv.at<float>(0, 2) = (*K)[idx](0, 2);
-		Kcv.at<float>(1, 1) = (*K)[idx](0, 0);
+		Kcv.at<float>(0, 2) = (*K)[idx](0, 0);
+		Kcv.at<float>(1, 1) = (*K)[idx](0, 2);
 		Kcv.at<float>(1, 2) = (*K)[idx](1, 2);
 		Kcv.at<float>(2, 2) = 1.0f;
 
@@ -167,11 +167,16 @@ namespace coloc
 			error += cv::norm(imagePoints[j] - reprojected[j]);
 		}
 
-		rmse = error / reprojected.size();
-
 		cv::Mat Sigma = cv::Mat(J.t() * J, cv::Rect(0, 0, 6, 6)).inv();
 		cv::Mat std_dev;
 		sqrt(Sigma.diag(), std_dev);
+		//std::cout << "Translation standard deviation:" << std::endl << std_dev.at<double>(3, 0) << std::endl << std_dev.at<double>(4, 0) << std::endl << std_dev.at<double>(5,0) << std::endl;
+
+		//std::cout << "Total standard deviation:" << std::endl << std_dev << std::endl;
+
+		poseCovariance[0][21] = std_dev.at<double>(3, 0);
+		poseCovariance[0][28] = std_dev.at<double>(4, 0);
+		poseCovariance[0][35] = std_dev.at<double>(5, 0);
 
 		return refineStatus;
 	}

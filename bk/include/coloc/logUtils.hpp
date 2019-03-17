@@ -87,12 +87,16 @@ namespace coloc
 		float pitch = eulerAngles[1] * 180 / M_PI;
 		float yaw = eulerAngles[2] * 180 / M_PI;
 
+		// float xPos = position[0] - 0.35 * yaw;
+		// float yPos = position[1] + 0.35 * pitch;
+		// float zPos = position[2];
+
 		file << idx << "," << dest << "," << source << ","
 			<< position[0] << "," << position[1] << "," << position[2] << ","
 			//	 << xPos << "," << yPos << "," << zPos << ","
-			<< cov[21] << "," << cov[22] << "," << cov[23] << ","
-			<< cov[27] << "," << cov[28] << "," << cov[29] << ","
-			<< cov[33] << "," << cov[34] << "," << cov[35] << ","
+			<< cov.at(0)[21] << "," << cov.at(0)[22] << "," << cov.at(0)[23] << ","
+			<< cov.at(0)[27] << "," << cov.at(0)[28] << "," << cov.at(0)[29] << ","
+			<< cov.at(0)[33] << "," << cov.at(0)[34] << "," << cov.at(0)[35] << ","
 			<< roll << "," << pitch << "," << yaw << "," << rmse << "," << nTracks << std::endl;
 
 		bool logStatus = file.good();

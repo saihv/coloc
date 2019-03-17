@@ -183,7 +183,7 @@ namespace coloc {
 			return EXIT_SUCCESS;
 		}
 
-#ifdef USE_STREAM
+#ifdef USE_ROS
 		// Process an image that is obtained from a ROS topic. converted_kps contains keypoints stored in OpenCV format.
 		void detectFeaturesTopic(uint8_t idx, coloc::FeatureMap& regions, cv_bridge::CvImagePtr imagePtr) override
 		{

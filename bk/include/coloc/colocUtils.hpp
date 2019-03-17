@@ -12,8 +12,6 @@
 #include <memory>
 #include <string>
 #include <dlib/optimization.h>
-#include <algorithm>
-#include <functional>
 
 using namespace openMVG;
 using namespace openMVG::features;
@@ -37,22 +35,22 @@ namespace coloc
 
 		void loadPoseCovariance(Cov6& cov, matrix<double, 3, 3>& covNew)
 		{
-			covNew = cov[21], cov[22], cov[23],
-				cov[27], cov[28], cov[29],
-				cov[33], cov[34], cov[35];
+			covNew = cov.at(0)[21], cov.at(0)[22], cov.at(0)[23],
+				cov.at(0)[27], cov.at(0)[28], cov.at(0)[29],
+				cov.at(0)[33], cov.at(0)[34], cov.at(0)[35];
 		}
 
 		void readPoseCovariance(matrix<double, 3, 3>& covNew, Cov6& cov)
 		{
-			cov[21] = covNew(0, 0);
-			cov[22] = covNew(0, 1);
-			cov[23] = covNew(0, 2);
-			cov[27] = covNew(1, 0);
-			cov[28] = covNew(1, 1);
-			cov[29] = covNew(1, 2);
-			cov[33] = covNew(2, 0);
-			cov[34] = covNew(2, 1);
-			cov[35] = covNew(2, 2);
+			cov.at(0)[21] = covNew(0, 0);
+			cov.at(0)[22] = covNew(0, 1);
+			cov.at(0)[23] = covNew(0, 2);
+			cov.at(0)[27] = covNew(1, 0);
+			cov.at(0)[28] = covNew(1, 1);
+			cov.at(0)[29] = covNew(1, 2);
+			cov.at(0)[33] = covNew(2, 0);
+			cov.at(0)[34] = covNew(2, 1);
+			cov.at(0)[35] = covNew(2, 2);
 		}
 
 		static Pair_Set handlePairs(const uint8_t numImages)
@@ -139,6 +137,8 @@ namespace coloc
 
 			return rotationMatrix;
 		}
+
+
 	private:
 
 		std::shared_ptr<Regions_Provider> mapFeatures;
@@ -191,6 +191,17 @@ namespace coloc
 		std::cout << "Number of common features between the maps: " << commonFeatures.size() << std::endl;
 
 		double scale = 0.0, scaleDiff = 1.0;
+		/*
+		Mat pt3D_1, pt3D_2;
+
+		pt3D_1.resize(3, commonFeatures.size());
+		pt3D_2.resize(3, commonFeatures.size());
+
+		for (size_t i = 0; i < commonFeatures.size(); ++i) {
+		pt3D_1.col(i) = data1.scene.GetLandmarks().at(data1.mapRegionIdx[commonFeatures[i].i_]).X;
+		pt3D_2.col(i) = data2.scene.GetLandmarks().at(data2.mapRegionIdx[commonFeatures[i].j_]).X;
+		}
+		*/
 		for (size_t i = 0; i < commonFeatures.size() - 1; ++i) {
 			Vec3 X11 = scene1.GetLandmarks().at(idx1[commonFeatures[i].i_]).X;
 			Vec3 X12 = scene1.GetLandmarks().at(idx1[commonFeatures[i + 1].i_]).X;
@@ -203,7 +214,7 @@ namespace coloc
 
 			scale += dist1 / dist2;
 
-			//std::cout << "Distance ratio: " << dist1/dist2 << std::endl;
+			std::cout << dist1/dist2 << std::endl;
 		}
 
 		scaleDiff = scale / (commonFeatures.size() - 1);
@@ -217,7 +228,7 @@ namespace coloc
 		}
 
 		for (unsigned int i = 0; i < scene.poses.size(); ++i) {
-			scene.poses[i] = Pose3(scene.poses.at(i).rotation(), scene.poses.at(i).center() * scale);
+			scene.poses[i] = Pose3(scene.poses.at(i).rotation(), scene.poses.at(i).translation() * scale);
 		}
 		return EXIT_SUCCESS;
 	}

@@ -5,12 +5,12 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(USE_CUDA "Enable CUDA features" ON)
+option(USE_CUDA "Enable CUDA features" OFF)
 option(USE_ROS "Enable ROS integration" OFF)
 option(USE_STREAM "Enable ROS image streaming" OFF)
 
 if(UNIX)
-  add_definitions(-DUSE_ROS)
+  #add_definitions(-DUSE_ROS)
   set(OpenMVG_DIR "/home/sai/lib/openMVG/install/share/openMVG/cmake")
 endif(UNIX)
 
@@ -21,49 +21,29 @@ if(MSVC)
   set(OpenCV_DIR "C:/Code/Libraries/opencv/install_release")
 endif(MSVC)
 
-add_subdirectory(../../github/dlib dlib_build)
+add_subdirectory(lib/dlib dlib_build)
 
 FIND_PACKAGE(OpenMVG REQUIRED)
 FIND_PACKAGE(OpenCV REQUIRED)
 
-if(UNIX)
-  find_package(
-    catkin REQUIRED COMPONENTS
-    cv_bridge
-    roscpp
-    std_msgs
-    image_transport
-  )
-
-  catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES coloc
-  CATKIN_DEPENDS cv_bridge roscpp std_msgs image_transport
-#  DEPENDS system_lib
-  )
-endif(UNIX)
 
 if(USE_CUDA)
   add_definitions(-DUSE_CUDA)
   FIND_PACKAGE(CUDA REQUIRED) 
-  SET(CUDA_NVCC_FLAGS "-arch=sm_61" CACHE STRING "nvcc flags" FORCE)
+  SET(CUDA_NVCC_FLAGS "-arch=sm_50" CACHE STRING "nvcc flags" FORCE)
   SET (CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE)
   SET(LIB_TYPE STATIC) 
   include_directories(include)
   CUDA_ADD_LIBRARY(koral ${LIB_TYPE} src/CUDALERP.cu src/CLATCH.cu src/CUDAK2NN.cu)
 endif(USE_CUDA)
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -std=c++11 -march=native -fpermissive -mavx2 -ftree-vectorize -funroll-all-loops")
 
 include_directories(
 if(MSVC)
   include
 endif(MSVC)
   ${OPENMVG_INCLUDE_DIRS}
-
-if(UNIX)
-  ${catkin_INCLUDE_DIRS}
-endif(UNIX)
   ${OPENCV_INCLUDE_DIRS}
 )
 
@@ -108,11 +88,6 @@ target_link_libraries(coloc
   vlsift
   dlib::dlib
  )
-
-
-if(UNIX)
-  target_link_libraries(coloc ${catkin_LIBRARIES})
-endif(UNIX)
 
 if(USE_CUDA)
   target_link_libraries(coloc koral)

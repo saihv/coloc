@@ -31,7 +31,7 @@ namespace coloc
 
 	private:
 		std::pair<int, int> *imageSize;
-		int iterationCount = 256;
+		int iterationCount = 4096;
 		std::vector <Mat3> *K;
 		colocParams *params;
 
@@ -160,7 +160,7 @@ namespace coloc
 
 			using KernelType = robust::ACKernelAdaptorEssential<
 				openMVG::essential::kernel::FivePointSolver,
-				openMVG::fundamental::kernel::SymmetricEpipolarDistanceError,
+				openMVG::fundamental::kernel::EpipolarDistanceError,
 				Mat3>;
 			KernelType kernel(x1, norm2Dpt_1, params.imageSize.first, params.imageSize.second,
 				x2, norm2Dpt_2, params.imageSize.first, params.imageSize.second,
@@ -170,7 +170,7 @@ namespace coloc
 			const auto ACRansacOut = ACRANSAC(kernel, relativePose_info.vec_inliers, iterationCount, &relativePose_info.essential_matrix,
 				relativePose_info.initial_residual_tolerance, false);
 
-			relativePose_info.found_residual_precision = ACRansacOut.first;
+			relativePose_info.found_residual_precision = 5.0;
 
 			if (relativePose_info.vec_inliers.size() < 2.5 * KernelType::Solver::MINIMUM_SAMPLES)
 				return EXIT_FAILURE;
@@ -243,54 +243,14 @@ namespace coloc
 			std::vector <IndMatch> putativeMatches, filteredMatches;
 
 			putativeMatches = commonFeatures;
+
 			commonFeatures.clear();
-			/*
-			const PointFeatures featI = scene1->GetRegionsPositions();
-			const PointFeatures featJ = scene2->GetRegionsPositions();
-
-			std::vector <IndMatch> pairMatches = putativeMatches;
-			Mat xL(2, pairMatches.size());
-			Mat xR(2, pairMatches.size());
-			for (size_t k = 0; k < pairMatches.size(); ++k) {
-				xL.col(k) = featI[pairMatches[k].i_].coords().cast<double>();
-				xR.col(k) = featJ[pairMatches[k].j_].coords().cast<double>();
-			}
-
-			RelativePose_Info relativePose;
-
-			const openMVG::cameras::Pinhole_Intrinsic_Radial_K3
-				camL(params->imageSize.first, params->imageSize.second, (params->K[0])(0, 0), (params->K[0])(0, 2), (params->K[0])(1, 2),
-				(params->dist[0])(0), (params->dist[0])(1), (params->dist[0])(2)),
-				camR(params->imageSize.first, params->imageSize.second, (params->K[0])(0, 0), (params->K[0])(0, 2), (params->K[0])(1, 2),
-				(params->dist[0])(0), (params->dist[0])(1), (params->dist[0])(2));
-
-			bool status, findPose = true;
-
-			status = filterHomography(&camL, &camR, xL, xR, relativePose, *params, findPose);
-			
-
-			if (status == EXIT_FAILURE)
-				std::cerr << "Unable to estimate relative pose." << std::endl;
-
-			else {
-				std::cout << "\nFound a relative transformation:\n"
-					<< "\tprecision: " << relativePose.found_residual_precision << " pixels\n"
-					<< "\t#inliers: " << relativePose.vec_inliers.size() << "\n"
-					<< "\t#matches: " << pairMatches.size() << "\n"
-					<< "Rotation: " << relativePose.relativePose.rotation() << "\n"
-					<< "Translation: " << relativePose.relativePose.center()
-					<< std::endl;
-			}
-
-			for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
-				commonFeatures.push_back(pairMatches[relativePose.vec_inliers[ic]]);
 
 			//matching::DistanceRatioMatch(
 			//	0.8, BRUTE_FORCE_HAMMING,
 			//	*scene1.get(),
 			//	*scene2.get(),
 			//	putativeMatches);
-			*/
 			
 			const PointFeatures featI = scene1->GetRegionsPositions();
 			const PointFeatures featJ = scene2->GetRegionsPositions();
@@ -324,14 +284,14 @@ namespace coloc
 				-A(1), A(0), 0;
 
 			Eigen::Matrix3d F;
-			F = (camR.Kinv()).transpose() * rotDiff.transpose() * (camL.K()).transpose() * C;
+			F = (camR.Kinv()).transpose() * rotDiff * (camL.K()).transpose() * C;
 			cv::eigen2cv(F, Fcv);
 
 			IndMatches inliers;
 			std::ofstream myfile;
 
 			std::vector <double> epipolarLineDeviations;
-			myfile.open("guidedmatches2.txt");
+			myfile.open("guidedmatches2.txt", std::ios_base::app);
 			for (size_t k = 0; k < putativeMatches.size(); ++k) {
 				Vec3 f1, f2;
 				f1 << xL(0, k), xL(1, k), 1;
@@ -348,7 +308,7 @@ namespace coloc
 				inliers.push_back(putativeMatches[k]);
 				myfile << res(0, 0) << "," << xL(0, k) << "," << xL(1, k) << "," << xR(0, k) << "," << xR(1, k) << std::endl;
 				epipolarLineDeviations.push_back(std::abs(res(0, 0)));
-				//std::cout << std::abs(res(0,0)) << std::endl;
+				std::cout << std::abs(res(0,0)) << std::endl;
 			}
 			myfile.close();
 
@@ -358,18 +318,16 @@ namespace coloc
 
 			std::sort(std::begin(matchIndices), std::end(matchIndices), [&](int i1, int i2) { return epipolarLineDeviations[i1] < epipolarLineDeviations[i2]; });
 			std::sort(epipolarLineDeviations.begin(), epipolarLineDeviations.end());
-			for (int ic = 0; ic < inliers.size(); ++ic)
-				commonFeatures.push_back(inliers[ic]);
-			/*
-			if (matchIndices.size() != 0) {
-				for (int ic = 0; ic < 2; ic++)
-					commonFeatures.push_back(putativeMatches[matchIndices[ic]]);
-			}
-			*/
+			//for (int ic = 0; ic < inliers.size(); ++ic)
+			//	commonFeatures.push_back(inliers[ic]);
+
+			for (int ic = 0; ic < 2; ic++)
+				commonFeatures.push_back(putativeMatches[matchIndices[ic]]);
+			
 			return EXIT_SUCCESS;
 		}
 
-		bool computeRelativePose(RelativePose_Info& relativePose, Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)
+		std::unique_ptr <RelativePose_Info> computeRelativePose(Pair current_pair, FeatureMap& regions, PairWiseMatches& putativeMatches)
 		{
 			const uint32_t I = std::min(current_pair.first, current_pair.second);
 			const uint32_t J = std::max(current_pair.first, current_pair.second);
@@ -380,7 +338,12 @@ namespace coloc
 			std::vector <IndMatch> pairMatches = putativeMatches[current_pair];
 			Mat xL(2, pairMatches.size());
 			Mat xR(2, pairMatches.size());
-					
+			for (size_t k = 0; k < pairMatches.size(); ++k) {
+				xL.col(k) = featI[pairMatches[k].i_].coords().cast<double>();
+				xR.col(k) = featJ[pairMatches[k].j_].coords().cast<double>();
+			}
+
+			RelativePose_Info relativePose;
 
 			const openMVG::cameras::Pinhole_Intrinsic_Radial_K3
 				camL(params->imageSize.first, params->imageSize.second, (params->K[current_pair.first])(0, 0), (params->K[current_pair.first])(0, 2), (params->K[current_pair.first])(1, 2), 
@@ -389,13 +352,6 @@ namespace coloc
 					(params->dist[current_pair.second])(0), (params->dist[current_pair.second])(1), (params->dist[current_pair.second])(2));
 
 			bool status, findPose = true;
-
-			for (size_t k = 0; k < pairMatches.size(); ++k) {
-				xL.col(k) = featI[pairMatches[k].i_].coords().cast<double>();
-				xL.col(k) = camL.get_ud_pixel(xL.col(k));
-				xR.col(k) = featJ[pairMatches[k].j_].coords().cast<double>();
-				xR.col(k) = camR.get_ud_pixel(xR.col(k));
-			}
 
 			if (params->model == 'H')
 				status = filterHomography(&camL, &camR, xL, xR, relativePose, *params, findPose);
@@ -420,36 +376,7 @@ namespace coloc
 					<< std::endl;
 			}
 
-			return status;
-		}
-
-		bool filterMatchesPair(Pair currentPair, FeatureMap& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, InterPoseMap& relativePoses)
-		{
-			std::vector <IndMatch> pairMatches = putativeMatches[currentPair];
-			RelativePose_Info relativePose;
-			
-			bool status = computeRelativePose(relativePose, currentPair, regions, putativeMatches);
-
-			std::vector <IndMatch> vec_geometricMatches;
-			for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
-				vec_geometricMatches.push_back(pairMatches[relativePose.vec_inliers[ic]]);
-
-			if (!vec_geometricMatches.empty())
-			{
-				PairWiseMatches::iterator it = geometricMatches.find(currentPair);
-				if (geometricMatches.end() != it)
-					geometricMatches.at(currentPair) = vec_geometricMatches;
-				else
-					geometricMatches.insert({ { currentPair.first, currentPair.second }, std::move(vec_geometricMatches) });
-			}
-
-			InterPoseMap::iterator it = relativePoses.find(currentPair);
-			if (relativePoses.end() != it)
-				relativePoses.at(currentPair) = relativePose;
-			else
-				relativePoses.insert({ { currentPair.first, currentPair.second }, std::move(relativePose) });
-			
-			return status;
+			return std::make_unique<RelativePose_Info>(relativePose);
 		}
 
 		void filterMatches(FeatureMap& regions, PairWiseMatches& putativeMatches, PairWiseMatches& geometricMatches, InterPoseMap& relativePoses)
@@ -457,13 +384,11 @@ namespace coloc
 			for (const auto matchedPair : putativeMatches) {
 				Pair currentPair = matchedPair.first;
 				std::vector <IndMatch> pairMatches = putativeMatches[currentPair];
-				RelativePose_Info relativePose;
-				
-				bool status = computeRelativePose(relativePose, matchedPair.first, regions, putativeMatches);
+				std::unique_ptr<RelativePose_Info> relativePose = computeRelativePose(matchedPair.first, regions, putativeMatches);
 
 				std::vector <IndMatch> vec_geometricMatches;
-				for (int ic = 0; ic < relativePose.vec_inliers.size(); ++ic)
-					vec_geometricMatches.push_back(pairMatches[relativePose.vec_inliers[ic]]);
+				for (int ic = 0; ic < relativePose->vec_inliers.size(); ++ic)
+					vec_geometricMatches.push_back(pairMatches[relativePose->vec_inliers[ic]]);
 
 				if (!vec_geometricMatches.empty())
 				{
@@ -474,11 +399,10 @@ namespace coloc
 						geometricMatches.insert({ { currentPair.first, currentPair.second }, std::move(vec_geometricMatches) });
 				}
 
-				InterPoseMap::iterator it = relativePoses.find(currentPair);
-				if (relativePoses.end() != it)
-					relativePoses.at(currentPair) = relativePose;
+				if (relativePoses.empty())
+					relativePoses.insert({ currentPair, *relativePose });
 				else
-					relativePoses.insert({ { currentPair.first, currentPair.second }, std::move(relativePose) });
+					relativePoses.at(currentPair) = *relativePose;
 			}
 		}
 	};

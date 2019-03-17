@@ -41,7 +41,14 @@ namespace coloc
 				std::cout << "Unable to read image from the given path." << std::endl;
 			}
 
+			//std::unique_ptr <features::Regions> regionsImage;
 			regions[idx] = describe_AKAZE(imageGray);
+			//if (!image_describer->Describe(imageGray, regions[idx])) {
+			//	std::cout << "Feature detection failed.";
+			//	return EXIT_FAILURE;
+			//}
+
+			//regions[idx] = std::make_unique <AKAZE_Binary_Regions> (*regionsImage.get());
 			return EXIT_SUCCESS;
 		}
 
@@ -51,7 +58,7 @@ namespace coloc
 
 		}
 #endif
-/*
+
 		bool saveFeatureData(uint16_t id, FeatureMap &regions, std::string &name)
 		{
 			const std::string
@@ -63,6 +70,5 @@ namespace coloc
 			else
 				return EXIT_SUCCESS;
 		}
-		*/
 	};
 }

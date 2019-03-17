@@ -13,7 +13,6 @@ namespace coloc
 			std::string number = std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);  //std::to_string(imageNumber); //std::string(4 - std::to_string(imageNumber).length(), '0') + std::to_string(imageNumber);
 			data->filenames[id] = params->imageFolder + "img__Quad" + std::to_string(id) + "_" + number + ".png";  //"image (" + number + ").png";
 			detector.detectFeaturesFile(id, data->regions, data->filenames[id]);
-			data->scene.views[id].reset(new View(data->filenames[id], id, 0, id, params->imageSize.first, params->imageSize.second));
 		}
 
 		void processImages(std::vector <int>& droneIds) override

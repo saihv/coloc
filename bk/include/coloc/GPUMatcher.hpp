@@ -159,7 +159,7 @@ namespace coloc
 			commonFeatures = computeMatches(const_cast<unsigned int*>(static_cast<const unsigned int*>(map1->DescriptorRawData())),
 				const_cast<unsigned int*>(static_cast<const unsigned int*>(map2->DescriptorRawData())),
 				map1->RegionCount(),
-				map2->RegionCount(), 60);
+				map2->RegionCount(), 40);
 		}
 
 		void computeMatchesPair(const Pair& pairIdx, FeatureMap& regions, IndMatches &putativeMatches)
@@ -186,12 +186,10 @@ namespace coloc
 			const size_t sizeDTraining = (numKPTraining + 8) * 64; // D2 for descriptor2
 
 			gpuErrchk(cudaMemsetAsync(d_descT, 0, sizeDTraining, m_stream1));
-			cudaStreamSynchronize(m_stream1);
 			gpuErrchk(cudaMemcpyAsync(d_descT, h_descriptorsTraining, sizeDTraining, cudaMemcpyHostToDevice, m_stream1));
 			cudaStreamSynchronize(m_stream1);			
 
 			gpuErrchk(cudaMemsetAsync(d_descQ, 0, sizeDQuery, m_stream2));
-			cudaStreamSynchronize(m_stream1);
 			gpuErrchk(cudaMemcpyAsync(d_descQ, h_descriptorsQuery, sizeDQuery, cudaMemcpyHostToDevice, m_stream2));
 			cudaStreamSynchronize(m_stream2);
 

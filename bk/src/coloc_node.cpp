@@ -1,3 +1,5 @@
+#pragma once
+
 #include "coloc/coloc.hpp"
 
 using namespace openMVG;
@@ -31,6 +33,8 @@ void readCalibData(std::pair <int, int>& imageSize, std::vector<Mat3>& K, std::v
 		}
 
 		Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > copiedMatrix(&values[0]);
+
+		//Eigen::Matrix3d copiedMatrix = Eigen::Map<Eigen::Matrix3d>(&values[0], 3, 3);
 		K.push_back(copiedMatrix);
 		values.clear();
 		++rows;
@@ -65,7 +69,12 @@ int main(int argc, char **argv)
 		std::vector <Mat3> K;
 		std::vector <Vec3> dist;
 
-		std::string imageFolder = "/home/sai/sampleColoc/";
+		//std::string imageFolder = "C:\\Datasets\\coloc\\AirSim\\3straight\\2018-09-21-16-23-05\\images\\";
+		//std::string imageFolder = "C:\\Datasets\\coloc\\AirSim\\updateTest\\";
+		//std::string imageFolder = "C:\\Datasets\\12_10\\outdoor\\";
+		//std::string imageFolder = "C:\\Datasets\\12_16\\ut_shortBaseline\\";
+		//std::string imageFolder = "C:\\Datasets\\12_21\\test\\";
+		std::string imageFolder = "C:\\Datasets\\AirSim\\interTest3\\";
 		std::string calibFilename = imageFolder + "calib.txt";
 
 		readCalibData(imageSize, K, dist, calibFilename, numDrones);
@@ -75,14 +84,14 @@ int main(int argc, char **argv)
 
 		Dopts.width = imageSize.first;
 		Dopts.height = imageSize.second;
-		Dopts.maxkp = 5000;
+		Dopts.maxkp = 40000;
 		Dopts.scale_factor = 1.2;
 		Dopts.scale_levels = 8;
-		Dopts.thresh = 40;
+		Dopts.thresh = 20;
 
 		Mopts.distRatio = 0.8;
-		Mopts.maxkp = 5000;
-		Mopts.thresh = 60;
+		Mopts.maxkp = 40000;
+		Mopts.thresh = 40;
 
 		coloc::colocParams params(K, dist, 'E', std::make_pair(imageSize.first, imageSize.second), imageFolder, Dopts, Mopts);
 

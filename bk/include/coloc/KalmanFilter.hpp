@@ -41,36 +41,19 @@ namespace coloc
 			measurementsAvailable = true;
 		}
 
-		void update(int& droneId, Pose3& pose, Cov6& cov, float& rmse)
+		void update(int& droneId, Pose3& pose, float& rmse)
 		{
 			cv::Mat predicted, estimated; 
 			predicted = droneFilters[droneId].predict();
 
-			//cv::setIdentity(droneFilters[droneId].measurementNoiseCov, cv::Scalar::all(rmse/10000));
-
-			droneFilters[droneId].measurementNoiseCov.at<double>(3, 3) = cov[21] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(3, 4) = cov[22] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(3, 5) = cov[23] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(4, 3) = cov[27] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(4, 4) = cov[28] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(4, 5) = cov[29] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(5, 3) = cov[33] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(5, 4) = cov[34] * rmse;
-			droneFilters[droneId].measurementNoiseCov.at<double>(5, 5) = cov[35] * rmse;
+			cv::setIdentity(droneFilters[droneId].measurementNoiseCov, cv::Scalar::all(rmse/1000));
 
 			if (measurementsAvailable) {
+				estimated = droneFilters[droneId].correct(droneMeasurements[droneId]);
 				bool reject = chiSquareGating(droneId, droneMeasurements[droneId], predicted);
-				if (reject && !init) {
-					estimated = predicted;
-				}
-				else
-				{
-					estimated = droneFilters[droneId].correct(droneMeasurements[droneId]);
-				}
 			}
-			else {
-				estimated = predicted;
-			}
+			else
+				estimated = predicted;			
 
 			Vec3 t;
 			t[0] = estimated.at<double>(0);
@@ -78,9 +61,9 @@ namespace coloc
 			t[2] = estimated.at<double>(2);
 
 			cv::Mat eulers_estimated(3, 1, CV_64F);
-			eulers_estimated.at<double>(0) = estimated.at<double>(3);
-			eulers_estimated.at<double>(1) = estimated.at<double>(4);
-			eulers_estimated.at<double>(2) = estimated.at<double>(5);
+			eulers_estimated.at<double>(0) = estimated.at<double>(9);
+			eulers_estimated.at<double>(1) = estimated.at<double>(10);
+			eulers_estimated.at<double>(2) = estimated.at<double>(11);
 
 			cv::Mat Rcv = coloc::Utils::euler2rot(eulers_estimated);
 
@@ -89,33 +72,48 @@ namespace coloc
 
 			pose = Pose3(R, t);
 			measurementsAvailable = false;
-			
-			if (droneId == 2)
-				init = false;
 		}
 
 	private:
-		int nStates = 6;            
+		int nStates = 18;            
 		int nMeasurements = 6;       
 		int nInputs = 0;             
-		double dt = 0.066;   
-		bool init = true;
+		double dt = 0.125;   
 		bool measurementsAvailable;
 
 		void initKalmanFilter(cv::KalmanFilter &KF, int nStates, int nMeasurements, int nInputs, double dt)
 		{
 			KF.init(nStates, nMeasurements, nInputs, CV_64F);                 // init Kalman Filter
-			cv::setIdentity(KF.processNoiseCov, cv::Scalar::all(1e-2));       // set process noise
-			cv::setIdentity(KF.measurementNoiseCov, cv::Scalar::all(1e-1));   // set measurement noise
+			cv::setIdentity(KF.processNoiseCov, cv::Scalar::all(1e-5));       // set process noise
+			cv::setIdentity(KF.measurementNoiseCov, cv::Scalar::all(1e-3));   // set measurement noise
 			cv::setIdentity(KF.errorCovPost, cv::Scalar::all(1));             // error covariance
 
+			KF.transitionMatrix.at<double>(0, 3) = dt;
+			KF.transitionMatrix.at<double>(1, 4) = dt;
+			KF.transitionMatrix.at<double>(2, 5) = dt;
+			KF.transitionMatrix.at<double>(3, 6) = dt;
+			KF.transitionMatrix.at<double>(4, 7) = dt;
+			KF.transitionMatrix.at<double>(5, 8) = dt;
+			KF.transitionMatrix.at<double>(0, 6) = 0.5*pow(dt, 2);
+			KF.transitionMatrix.at<double>(1, 7) = 0.5*pow(dt, 2);
+			KF.transitionMatrix.at<double>(2, 8) = 0.5*pow(dt, 2);
+
+			KF.transitionMatrix.at<double>(9, 12) = dt;
+			KF.transitionMatrix.at<double>(10, 13) = dt;
+			KF.transitionMatrix.at<double>(11, 14) = dt;
+			KF.transitionMatrix.at<double>(12, 15) = dt;
+			KF.transitionMatrix.at<double>(13, 16) = dt;
+			KF.transitionMatrix.at<double>(14, 17) = dt;
+			KF.transitionMatrix.at<double>(9, 15) = 0.5*pow(dt, 2);
+			KF.transitionMatrix.at<double>(10, 16) = 0.5*pow(dt, 2);
+			KF.transitionMatrix.at<double>(11, 17) = 0.5*pow(dt, 2);
 
 			KF.measurementMatrix.at<double>(0, 0) = 1;  // x
 			KF.measurementMatrix.at<double>(1, 1) = 1;  // y
 			KF.measurementMatrix.at<double>(2, 2) = 1;  // z
-			KF.measurementMatrix.at<double>(3, 3) = 1;  // roll
-			KF.measurementMatrix.at<double>(4, 4) = 1; // pitch
-			KF.measurementMatrix.at<double>(5, 5) = 1; // yaw
+			KF.measurementMatrix.at<double>(3, 9) = 1;  // roll
+			KF.measurementMatrix.at<double>(4, 10) = 1; // pitch
+			KF.measurementMatrix.at<double>(5, 11) = 1; // yaw
 		}
 
 		bool chiSquareGating(int& droneId, cv::Mat& estimated, cv::Mat& predicted)
@@ -141,23 +139,16 @@ namespace coloc
 			cv::cv2eigen(innv, innveig);
 			cv::cv2eigen(estimated, estimateeig);
 
-			double dist = mDist.at<double>(0, 0);
-
-			std::cout << dist << std::endl;
+			std::cout << mDist.at<double>(0, 0) << std::endl;
 
 			std::ofstream myfile;
 			myfile.open("mahalanobis.txt", std::ios_base::app);
 
-			myfile << droneId << "," << dist << std::endl;
+			myfile << droneId << "," << mDist.at<double>(0,0) << std::endl;
 
 			myfile.close();
 
-			if (dist > 10) {
-				std::cout << "Need to reject";
-				return true;
-			}
-			else
-				return false;
+			return true;
 		}
 	};
 }
