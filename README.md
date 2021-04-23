@@ -4,6 +4,7 @@
 
 CoLoC is a computer vision based pipeline for collaborative localization between multiple cameras. The targeted application for this software is collaborative localization for micro aerial vehicles equipped with monocular cameras, as described in our paper "Collaborative Localization for Micro Aerial Vehicles". If you find our paper or this code useful in your research, please cite our work as follows:
 
+```
 @article{vemprala2021collaborative,
   author={Vemprala, Sai H. and Saripalli, Srikanth},
   journal={IEEE Access}, 
@@ -11,6 +12,7 @@ CoLoC is a computer vision based pipeline for collaborative localization between
   year={2021},
   pages={1-16},
   doi={10.1109/ACCESS.2021.3074537}}
+```
 
 The code is intended as a basic demonstration of the various modules used in this pipeline. 
 
