@@ -2,12 +2,17 @@
 
 [![Codacy Badge](https://api.codacy.com/project/badge/Grade/82f2d7a3d4904abe8abb577aea4e9fdc)](https://app.codacy.com/app/saihv/coloc?utm_source=github.com&utm_medium=referral&utm_content=saihv/coloc&utm_campaign=Badge_Grade_Dashboard)
 
-CoLoC is a computer vision based pipeline for collaborative localization between multiple cameras. The targeted application for this software is collaborative localization for micro aerial vehicles equipped with monocular cameras, as described in the following papers:
+CoLoC is a computer vision based pipeline for collaborative localization between multiple cameras. The targeted application for this software is collaborative localization for micro aerial vehicles equipped with monocular cameras, as described in our paper "Collaborative Localization for Micro Aerial Vehicles". If you find our paper or this code useful in your research, please cite our work as follows:
 
-[1] Sai Vemprala and Srikanth Saripalli. "Monocular Vision based Collaborative Localization for Micro Aerial Vehicle Swarms." 2018 IEEE International Conference on Unmanned Aircraft Systems (ICUAS), pp, 315-323. IEEE, 2018. (https://arxiv.org/abs/1804.02510)  
-[2] Sai Vemprala and Srikanth Saripalli. "Vision based collaborative localization for multirotor vehicles." 2016 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), pp. 1653-1658. IEEE, 2016.
+@article{vemprala2021collaborative,
+  author={Vemprala, Sai H. and Saripalli, Srikanth},
+  journal={IEEE Access}, 
+  title={Collaborative Localization for Micro Aerial Vehicles}, 
+  year={2021},
+  pages={1-16},
+  doi={10.1109/ACCESS.2021.3074537}}
 
-The code is still a work in progress, with ROS integration, final refinements and testing underway. Install and setup instructions will be added soon.
+The code is intended as a basic demonstration of the various modules used in this pipeline. 
 
 Libraries/modules used within this project:
 
